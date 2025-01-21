@@ -1,0 +1,60 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+.virtualenv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Log files
+*.log
+*.out
+*.err
+
+# Cache files and directories
+*.cache
+*.coverage
+*.pytest_cache/
+*.mypy_cache/
+.cache/
+
+# Environment files
+*.env
+.env.*
+env.yaml
+
+# Python packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Generated docs
+/docs/_build/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+*.swp
+
+# Data files
+*.csv
+*.tsv
+*.dat
+*.db
+*.sqlite
+*.h5
+
+# Miscellaneous
+*.bak
+*.tmp
