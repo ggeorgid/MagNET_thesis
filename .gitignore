@@ -58,3 +58,6 @@ Thumbs.db
 # Miscellaneous
 *.bak
 *.tmp
+
+# Added by me to the template
+dataset*.npy
