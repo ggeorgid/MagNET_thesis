@@ -61,3 +61,4 @@ Thumbs.db
 
 # Added by me to the template
 dataset*.npy
+data/raw/dataset_raw
