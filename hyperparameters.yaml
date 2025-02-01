@@ -1,0 +1,14 @@
+# General Settings
+SEED: 42
+USE_GPU: True
+DOWNLOAD_DATASET: True  # Checks if the user wants to download the dataset
+USE_CACHED_SCALOGRAMS: True # Checks if the user wants to use the cached scalograms
+
+# Training Parameters
+NUM_EPOCH: 5
+BATCH_SIZE: 32
+LEARNING_RATE: 0.001
+
+
+
+
