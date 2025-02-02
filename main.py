@@ -1,17 +1,15 @@
 import torch
-import os
 import numpy as np
 from pathlib import Path
 import random
 import yaml
-import pywt
 import matplotlib
-matplotlib.use("TkAgg")  # Use an interactive backend
+matplotlib.use("QtAgg") # Use Qt6 because TkAgg had conflicts with num_of_workers variable <-weird
 import matplotlib.pyplot as plt
 
 # Import dataset-related functions from the `data/` folder
 from data.download_dataset import download_dataset
-from data.preprocess_dataset import check_dataset_exists, check_cached_scalograms, convert_to_npy, convert_to_tensors, calculate_core_loss, calculate_scalograms 
+from data.preprocess_dataset import check_dataset_exists, check_cached_scalograms, convert_to_npy, convert_to_tensors, calculate_core_loss, split_dataset, create_dataloaders
 from data.wavelet_coreloss_dataset import WaveletCoreLossDataset
 
 def main():
@@ -37,7 +35,8 @@ def main():
     lr = config["LEARNING_RATE"]
     download_dataset_flag = config.get("DOWNLOAD_DATASET", True)
     use_cached_scalograms = config.get("USE_CACHED_SCALOGRAMS", True)
-    
+    data_subset_size = config.get("DATA_SUBSET_SIZE", None)
+        
     print(f"\n🔹 Hyperparameters Loaded:")
     print(f"   - SEED: {seed}")
     print(f"   - USE_GPU: {use_gpu}")
@@ -131,6 +130,13 @@ def main():
     # Inspect first sample in core loss dataset
     sample = core_loss_dataset[0]
     print(f"🔹 First sample in the core loss dataset:\n{sample}\n")
+    
+    # Apply dataset subsetting if specified using random permutation ordering e.g. tensor([523, 198, 754, 12, 899, ...])
+    if data_subset_size:
+        print(f"[INFO] Subsetting enabled. Preparing to select {data_subset_size} samples.")
+        indices = torch.randperm(len(tensor_dataset))[:data_subset_size]
+        tensor_dataset = torch.utils.data.Subset(tensor_dataset, indices)
+        print(f"[INFO] Using a subset of {data_subset_size} samples for training/debugging.\n")
             
     # -------------------------------- Handling Scalograms & Core Loss --------------------------------
     SAMPLE_RATE = 2e-6
@@ -156,7 +162,8 @@ def main():
             print("[INFO] Scalograms and core loss saved successfully.\n")
         except Exception as e:
             print(f"[ERROR] Failed to save scalograms or core loss: {e}")
-    
+        
+            
     # -------------------------------- Visualize a Random Scalogram --------------------------------
     random_idx = random.randint(0, len(wavelet_dataset) - 1)  # Pick a random index
 
@@ -172,25 +179,28 @@ def main():
     plt.show(block=False)  # Show plot without blocking
     plt.pause(10)  # Keep the plot open for 10 seconds
     plt.close()  # Automatically close the plot
-
-    # -------------------------------- DataLoader Setup ------------------------------------------
-    dataloader = torch.utils.data.DataLoader(wavelet_dataset, batch_size=batch_size, shuffle=True)
-    print(f"🔹 DataLoader initialized with batch size {batch_size}\n")
-
-    for scalogram_batch, core_loss_batch in dataloader:
-        print(f"🔹 Batch Loaded - Scalogram Shape: {scalogram_batch.shape}, Core Loss Shape: {core_loss_batch.shape}\n")
-
-        # ------------------------- Dataset Validation -------------------------
-        assert scalogram_batch.shape[0] == core_loss_batch.shape[0], "[ERROR] Batch size mismatch!"
-        assert scalogram_batch.shape[1:] == (1, 24, 24), f"[ERROR] Unexpected scalogram shape: {scalogram_batch.shape[1:]}"
-        assert core_loss_batch.ndim == 2 and core_loss_batch.shape[1] == 1, f"[ERROR] Unexpected core loss shape: {core_loss_batch.shape}"
-
-        print("[INFO] Dataset validation passed successfully!\n")
+      
+    # -------------------------------- Train/Validation/Test Split & Loading Dataloaders --------------------------------
+    train_dataset, valid_dataset, test_dataset = split_dataset(wavelet_dataset)
+    train_loader, valid_loader, test_loader = create_dataloaders(
+        train_dataset, valid_dataset, test_dataset, batch_size=batch_size, use_gpu=use_gpu
+    )
+    
+    # Move datasets to device
+    train_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in train_dataset]
+    valid_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in valid_dataset]
+    test_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in test_dataset]
+    
+    # Example DataLoader Validation
+    for scalogram_batch, core_loss_batch in train_loader:
+        scalogram_batch = scalogram_batch.to(device)
+        core_loss_batch = core_loss_batch.to(device)
+        print(f"Batch Loaded - Scalogram Shape: {scalogram_batch.shape}, Core Loss Shape: {core_loss_batch.shape}")
         break
 
-   
-   
-   
-   
+    print(f"Train Loader: {len(train_loader)}, Validation Loader: {len(valid_loader)}, Test Loader: {len(test_loader)}")
+    
+    
+    
 if __name__ == "__main__":
     main()

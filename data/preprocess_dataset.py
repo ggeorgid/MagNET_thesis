@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from skimage.transform import resize
 from tqdm import tqdm  # For progress visualization
+from torch.utils.data import DataLoader, random_split
 
 def check_dataset_exists(dataset_path):
     """
@@ -98,9 +99,10 @@ def convert_to_tensors(dataset: np.ndarray) -> torch.utils.data.TensorDataset:
 
     return torch.utils.data.TensorDataset(voltage, current)
 
+
 def calculate_core_loss(datalength: int, 
                         sample_rate: float,
-                        V_I_dataset: torch.utils.data.TensorDataset) -> torch.utils.data.TensorDataset:
+                        V_I_dataset: torch.utils.data.Dataset) -> torch.utils.data.TensorDataset:
     """
     Optimized calculation of core loss using vectorized PyTorch operations.
 
@@ -110,7 +112,7 @@ def calculate_core_loss(datalength: int,
         The length of each data sample (e.g., number of time steps).
     sample_rate : float
         The sample rate (time between each data point).
-    V_I_dataset : torch.utils.data.TensorDataset
+    V_I_dataset : torch.utils.data.Dataset
         The dataset containing voltage and current tensors.
 
     Returns:
@@ -119,10 +121,16 @@ def calculate_core_loss(datalength: int,
         A dataset containing the voltage and the computed core loss.
         core_loss_dataset.tensors returns a tuple of PyTorch tensors.
     """
-    
-    # Unpack dataset: (num_samples, datalength)
-    voltage_tensor, current_tensor = V_I_dataset.tensors  # Extract tensors
-    voltage_tensor = voltage_tensor[:, :datalength]  # Ensure correct slicing
+    # Handle both TensorDataset and Subset
+    if isinstance(V_I_dataset, torch.utils.data.Subset):
+        base_dataset = V_I_dataset.dataset
+        indices = V_I_dataset.indices
+        voltage_tensor, current_tensor = base_dataset.tensors[0][indices], base_dataset.tensors[1][indices]
+    else:
+        voltage_tensor, current_tensor = V_I_dataset.tensors
+
+    # Ensure correct slicing
+    voltage_tensor = voltage_tensor[:, :datalength]
     current_tensor = current_tensor[:, :datalength]
 
     # Compute instantaneous power (element-wise multiplication)
@@ -141,7 +149,6 @@ def calculate_core_loss(datalength: int,
     dataset = torch.utils.data.TensorDataset(voltage_tensor, core_loss)
 
     return dataset
-
 
 def calculate_scalograms(dataset: np.ndarray, 
                          wave_name: str = 'cgau8', 
@@ -193,3 +200,47 @@ def calculate_scalograms(dataset: np.ndarray,
     scalogram_tensor = torch.tensor(scalograms).unsqueeze(1)  # Shape: (num_samples, 1, 24, 24)
 
     return scalogram_tensor
+
+# DataLoader Utility Functions
+def split_dataset(dataset, train_ratio=0.6, valid_ratio=0.2):
+    """
+    Splits a dataset into training, validation, and test subsets.
+
+    Args:
+        dataset (Dataset): The dataset to be split.
+        train_ratio (float): Proportion of the dataset to be used for training.
+        valid_ratio (float): Proportion of the dataset to be used for validation.
+
+    Returns:
+        tuple: A tuple containing the training, validation, and test datasets.
+    """
+    train_size = int(train_ratio * len(dataset))
+    valid_size = int(valid_ratio * len(dataset))
+    test_size = len(dataset) - train_size - valid_size
+
+    return random_split(dataset, [train_size, valid_size, test_size])
+
+def create_dataloaders(train_dataset, valid_dataset, test_dataset, batch_size, num_workers=4, use_gpu=True):
+    """
+    Creates DataLoader objects for training, validation, and testing datasets.
+
+    Args:
+        train_dataset (Dataset): Dataset for training.
+        valid_dataset (Dataset): Dataset for validation.
+        test_dataset (Dataset): Dataset for testing.
+        batch_size (int): Number of samples per batch.
+        num_workers (int): Number of subprocesses to use for data loading.
+        use_gpu (bool): If True, enables pinned memory for faster GPU transfers.
+
+    Returns:
+        tuple: DataLoaders for training, validation, and testing.
+    """
+    kwargs = {'num_workers': num_workers, 'pin_memory': use_gpu}
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, **kwargs)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, **kwargs)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, **kwargs)
+
+    return train_loader, valid_loader, test_loader
+
+

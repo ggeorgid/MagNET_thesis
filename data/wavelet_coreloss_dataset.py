@@ -24,16 +24,25 @@ class WaveletCoreLossDataset(Dataset):
             self.scalograms = torch.tensor(np.load(scalograms_path), dtype=torch.float32)
             self.core_loss_values = torch.tensor(np.load(core_loss_path), dtype=torch.float32)
         elif V_I_dataset and sample_rate:
+            # Handle both TensorDataset and Subset
+            if isinstance(V_I_dataset, torch.utils.data.Subset):
+                base_dataset = V_I_dataset.dataset
+                indices = V_I_dataset.indices
+                voltage_data = base_dataset.tensors[0][indices].numpy()
+                datalength = sample_length or base_dataset.tensors[0].shape[1]
+            else:
+                voltage_data = V_I_dataset.tensors[0].numpy()
+                datalength = sample_length or V_I_dataset.tensors[0].shape[1]
+
             # Compute core loss using the provided function
             print("[INFO] Calculating core loss and scalograms from raw data.")
             self.core_loss_dataset = calculate_core_loss(
-                datalength=sample_length or V_I_dataset.tensors[0].shape[1],
+                datalength=datalength,
                 sample_rate=sample_rate,
                 V_I_dataset=V_I_dataset
             )
 
-            # Compute scalograms using the voltage data from V_I_dataset
-            voltage_data = V_I_dataset.tensors[0].numpy()
+            # Compute scalograms using the voltage data
             self.scalograms = calculate_scalograms(
                 dataset=np.stack((voltage_data, np.zeros_like(voltage_data)), axis=2),
                 wave_name=wave_name,
@@ -65,5 +74,4 @@ class WaveletCoreLossDataset(Dataset):
     def get_raw_scalogram(self, idx):
         """Returns raw scalogram data as a NumPy array for plotting."""
         return self.scalograms[idx].squeeze(0).numpy()
-
 
