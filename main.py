@@ -131,72 +131,36 @@ def main():
     # Inspect first sample in core loss dataset
     sample = core_loss_dataset[0]
     print(f"🔹 First sample in the core loss dataset:\n{sample}\n")
-        
-           
-    # # -------------------------------- Calculating Wavelets & Scalograms --------------------------------
-    
-    # SAMPLE_RATE = 2e-6
-    # wave_name = 'cgau8'  # Complex Gaussian wavelet
-
-    # # Initialize dataset with scalograms
-    # wavelet_dataset = WaveletCoreLossDataset(V_I_dataset=tensor_dataset, raw_dataset=dataset, sample_rate=SAMPLE_RATE, wave_name=wave_name)
-    # print(f"[INFO] WaveletCoreLossDataset length: {len(wavelet_dataset)}")
-    
-    # # -------------------------------- Handling and Storing Scalograms --------------------------------
-
-    # if use_cached_scalograms and check_cached_scalograms(preprocessed_data_path):
-    #     print("[INFO] Loading cached scalograms and core loss from disk.\n")
-    #     scalograms = torch.tensor(np.load(preprocessed_data_path / "scalograms.npy"))
-    #     core_loss = torch.tensor(np.load(preprocessed_data_path / "core_loss.npy"))
-    # else:
-    #     print("[INFO] Calculating scalograms and core loss. This may take some time...\n")
-    #     core_loss_dataset = calculate_core_loss(8192, 2e-6, tensor_dataset)
-    #     scalograms = calculate_scalograms(dataset)
-
-    #     # Save scalograms and core loss for future runs
-    #     np.save(preprocessed_data_path / "scalograms.npy", scalograms.numpy())
-    #     np.save(preprocessed_data_path / "core_loss.npy", core_loss_dataset.tensors[1].numpy())
-    #     core_loss = core_loss_dataset.tensors[1]
-        
-    # print(f"I'm currenty here ")   
-    # print(f"Dataset min: {dataset.min()}, max: {dataset.max()}")
-    # print(f"Sample data:\n{dataset[0]}")
-    
+            
     # -------------------------------- Handling Scalograms & Core Loss --------------------------------
-
     SAMPLE_RATE = 2e-6
-    wave_name = 'cgau8'  # Complex Gaussian wavelet
+    scalograms_path = preprocessed_data_path / "scalograms.npy"
+    core_loss_path = preprocessed_data_path / "core_loss.npy"
 
     if use_cached_scalograms and check_cached_scalograms(preprocessed_data_path):
         print("[INFO] Loading cached scalograms and core loss from disk.\n")
-        scalograms = torch.tensor(np.load(preprocessed_data_path / "scalograms.npy"))
-        core_loss = torch.tensor(np.load(preprocessed_data_path / "core_loss.npy"))
-        print(f"[INFO] Loaded scalograms shape: {scalograms.shape}")
-        print(f"[INFO] Loaded core loss shape: {core_loss.shape}")
+        wavelet_dataset = WaveletCoreLossDataset(
+            scalograms_path=scalograms_path,
+            core_loss_path=core_loss_path
+        )
     else:
-        print("[INFO] Creating WaveletCoreLossDataset and calculating scalograms and core loss. This may take some time...\n")
-        wavelet_dataset = WaveletCoreLossDataset(V_I_dataset=tensor_dataset, raw_dataset=dataset, sample_rate=SAMPLE_RATE, wave_name=wave_name)
+        print("[INFO] Creating WaveletCoreLossDataset and calculating scalograms and core loss.\n")
+        wavelet_dataset = WaveletCoreLossDataset(
+            V_I_dataset=tensor_dataset,
+            sample_rate=SAMPLE_RATE
+        )
 
-        # Extract data from wavelet_dataset
-        scalograms = torch.stack([wavelet_dataset[i][0] for i in range(len(wavelet_dataset))])
-        core_loss = torch.stack([wavelet_dataset[i][1] for i in range(len(wavelet_dataset))])
-
-        # Save scalograms and core loss for future runs with error handling
         try:
-            np.save(preprocessed_data_path / "scalograms.npy", scalograms.numpy())
-            np.save(preprocessed_data_path / "core_loss.npy", core_loss.numpy())
+            np.save(scalograms_path, wavelet_dataset.scalograms.numpy())
+            np.save(core_loss_path, wavelet_dataset.core_loss_values.numpy())
             print("[INFO] Scalograms and core loss saved successfully.\n")
         except Exception as e:
             print(f"[ERROR] Failed to save scalograms or core loss: {e}")
-
+    
     # -------------------------------- Visualize a Random Scalogram --------------------------------
+    random_idx = random.randint(0, len(wavelet_dataset) - 1)  # Pick a random index
 
-    random_idx = random.randint(0, len(scalograms) - 1)  # Pick a random index
-
-    if 'wavelet_dataset' in locals():
-        raw_scalogram = wavelet_dataset.get_raw_scalogram(random_idx)
-    else:
-        raw_scalogram = scalograms[random_idx].squeeze().numpy()
+    raw_scalogram = wavelet_dataset.get_raw_scalogram(random_idx)
 
     print(f"🔹 Visualizing scalogram from index {random_idx}...\n")
 
@@ -210,11 +174,9 @@ def main():
     plt.close()  # Automatically close the plot
 
     # -------------------------------- DataLoader Setup ------------------------------------------
-
-    dataloader = torch.utils.data.DataLoader(list(zip(scalograms, core_loss)), batch_size=batch_size, shuffle=True)
+    dataloader = torch.utils.data.DataLoader(wavelet_dataset, batch_size=batch_size, shuffle=True)
     print(f"🔹 DataLoader initialized with batch size {batch_size}\n")
 
-    # Check a batch
     for scalogram_batch, core_loss_batch in dataloader:
         print(f"🔹 Batch Loaded - Scalogram Shape: {scalogram_batch.shape}, Core Loss Shape: {core_loss_batch.shape}\n")
 
@@ -225,8 +187,6 @@ def main():
 
         print("[INFO] Dataset validation passed successfully!\n")
         break
-
-
 
    
    
