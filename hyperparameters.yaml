@@ -2,7 +2,7 @@
 SEED: 42
 USE_GPU: True
 DOWNLOAD_DATASET: True  # Checks if the user wants to download the dataset
-USE_CACHED_SCALOGRAMS: True # Checks if the user wants to use the cached scalograms 
+USE_CACHED_SCALOGRAMS: False # Checks if the user wants to use the cached scalograms 
 USE_GPU: True
 
 # Training Parameters

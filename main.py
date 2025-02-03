@@ -6,11 +6,17 @@ import yaml
 import matplotlib
 matplotlib.use("QtAgg") # Use Qt6 because TkAgg had conflicts with num_of_workers variable <-weird
 import matplotlib.pyplot as plt
+from torchinfo import summary  # Added for model summary
+
 
 # Import dataset-related functions from the `data/` folder
 from data.download_dataset import download_dataset
 from data.preprocess_dataset import check_dataset_exists, check_cached_scalograms, convert_to_npy, convert_to_tensors, calculate_core_loss, split_dataset, create_dataloaders
 from data.wavelet_coreloss_dataset import WaveletCoreLossDataset
+# Import the model
+from wavelet_model import WaveletModel  
+from utils.train_utils import train_model
+
 
 def main():
     # -------------------------------- Printing Essentials --------------------------------
@@ -199,6 +205,39 @@ def main():
         break
 
     print(f"Train Loader: {len(train_loader)}, Validation Loader: {len(valid_loader)}, Test Loader: {len(test_loader)}")
+    
+    # -------------------------------- Model Initialization --------------------------------
+    model = WaveletModel().to(device)
+    
+    # -------------------------------- Step 3: Forward Pass of a Single Batch --------------------------------
+    for scalogram_batch, core_loss_batch in train_loader:
+        scalogram_batch = scalogram_batch.to(device)
+        core_loss_batch = core_loss_batch.to(device)
+
+        with torch.no_grad():  # No need to track gradients for this inspection
+            output = model(scalogram_batch)
+
+        print(f"\n🔹 Forward Pass Output Shape: {output.shape}")
+        print(f"🔹 Forward Pass Output Sample: {output[:5]}\n")  # Show first 5 predictions
+        break  # Only inspect the first batch
+
+    # -------------------------------- Step 4: Model Summary Using torchinfo --------------------------------
+    print("🔹 Model Summary:\n")
+    summary(model, input_size=(batch_size, 1, 24, 24))
+    
+    # -------------------------------- Model Initialization --------------------------------
+    model = WaveletModel().to(device)
+
+    # -------------------------------- Training/Testing the Model --------------------------------
+    trained_model = train_model(
+        model=model,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_loader=test_loader,
+        config=config,
+        device=device
+    )
+    
     
     
     
