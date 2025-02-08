@@ -63,3 +63,4 @@ Thumbs.db
 dataset*.npy
 data/raw/
 *.npy
+wandb/

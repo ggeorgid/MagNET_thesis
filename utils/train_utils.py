@@ -23,7 +23,9 @@ def plot_results(y_true, y_pred):
     plt.title('Error Distribution')
 
     plt.tight_layout()
-    plt.show(block=True)  # Keep the plot window open until manually closed
+    plt.show(block=False)
+    plt.pause(10)
+    plt.close()  # Keep the plot window open until manually closed
 
 def train_model(model, train_loader, valid_loader, test_loader, config, device):
     # Loss function and optimizer
@@ -76,38 +78,42 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device):
         train_mae = mean_absolute_error(y_train_true, y_train_pred)
         valid_mae = mean_absolute_error(y_valid_true, y_valid_pred)
 
-        # Logging
-        avg_train_loss = epoch_train_loss / len(train_loader)
-        avg_valid_loss = epoch_valid_loss / len(valid_loader)
+        # Test Evaluation After Each Epoch
+        model.eval()
+        y_true, y_pred = [], []
+        with torch.inference_mode():
+            for scalograms, core_loss in test_loader:
+                scalograms, core_loss = scalograms.to(device), core_loss.to(device)
+                predictions = model(scalograms)
+                y_true.append(core_loss)
+                y_pred.append(predictions)
 
-        print(f"Epoch {epoch:02d} | Train Loss: {avg_train_loss:.6f} | Validation Loss: {avg_valid_loss:.6f} | "
+        y_true = torch.cat(y_true, dim=0).cpu().numpy()
+        y_pred = torch.cat(y_pred, dim=0).cpu().numpy()
+
+        test_loss = criterion(torch.tensor(y_pred), torch.tensor(y_true)).item()
+        test_r2 = r2_score(y_true, y_pred)
+        test_mae = mean_absolute_error(y_true, y_pred)
+
+        print(f"Epoch {epoch:02d} | Train Loss: {epoch_train_loss:.6f} | Validation Loss: {epoch_valid_loss:.6f} | "
               f"Train R²: {train_r2:.4f} | Validation R²: {valid_r2:.4f} | "
               f"Train MAE: {train_mae:.6f} | Validation MAE: {valid_mae:.6f}")
-
-    # Testing
-    model.eval()
-    y_true, y_pred = [], []
-    with torch.inference_mode():
-        for scalograms, core_loss in test_loader:
-            scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-            predictions = model(scalograms)
-
-            y_true.append(core_loss)
-            y_pred.append(predictions)
-
-    y_true = torch.cat(y_true, dim=0).cpu().numpy()
-    y_pred = torch.cat(y_pred, dim=0).cpu().numpy()
-
-    # Test Loss and Metrics
-    test_loss = criterion(torch.tensor(y_pred), torch.tensor(y_true)).item()
-    test_r2 = r2_score(y_true, y_pred)
-    test_mae = mean_absolute_error(y_true, y_pred)
-
-    print(f"\nFinal Test Loss: {test_loss:.6f}")
-    print(f"Final Test R² Score: {test_r2:.4f}")
-    print(f"Final Test MAE: {test_mae:.6f}")
 
     # Visualization of Predictions
     plot_results(y_true, y_pred)
 
+    # Save model
+    torch.save(model.state_dict(), "trained_model.pth")
+
     return model
+
+
+
+
+
+
+
+
+
+
+

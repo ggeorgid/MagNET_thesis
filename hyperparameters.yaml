@@ -2,14 +2,16 @@
 SEED: 42
 USE_GPU: True
 DOWNLOAD_DATASET: True  # Checks if the user wants to download the dataset
-USE_CACHED_SCALOGRAMS: False # Checks if the user wants to use the cached scalograms 
-USE_GPU: True
+USE_CACHED_SCALOGRAMS: True # Checks if the user wants to use the cached scalograms 
+
 
 # Training Parameters
 NUM_EPOCH: 5
 BATCH_SIZE: 32
 LEARNING_RATE: 0.001
 DATA_SUBSET_SIZE: 128  # Set to None to use the full dataset
-#Be careful with the DATA_SUBSET_SIZE parameter, you have to change USE_CACHED_SCALOGRAMS to False the first time
+#The line bellow is no longer true because we use a random permutation of the dataset to avoid data leakage(2025-02-08)
+  #Be careful with the DATA_SUBSET_SIZE parameter, you have to change USE_CACHED_SCALOGRAMS to False the first time
+
 
 

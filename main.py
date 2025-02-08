@@ -11,7 +11,7 @@ from torchinfo import summary  # Added for model summary
 
 # Import dataset-related functions from the `data/` folder
 from data.download_dataset import download_dataset
-from data.preprocess_dataset import check_dataset_exists, check_cached_scalograms, convert_to_npy, convert_to_tensors, calculate_core_loss, split_dataset, create_dataloaders
+from data.preprocess_dataset import check_dataset_exists, convert_to_npy, convert_to_tensors, split_dataset, create_dataloaders
 from data.wavelet_coreloss_dataset import WaveletCoreLossDataset
 # Import the model
 from wavelet_model import WaveletModel  
@@ -78,7 +78,12 @@ def main():
     preprocessed_data_path = Path("data/processed")
     preprocessed_data_path.mkdir(parents=True, exist_ok=True)  # Ensure directory exists       
     
-    convert_to_npy(preprocessed_data_path, raw_data_path)
+    
+    # Check if dataset.npy exists before processing
+    dataset_file = preprocessed_data_path / "dataset.npy"
+    if not dataset_file.exists():
+        convert_to_npy(preprocessed_data_path, raw_data_path)
+    
     
     # Load the .npy dataset
     dataset = np.load(f"{preprocessed_data_path}/dataset.npy")
@@ -86,90 +91,49 @@ def main():
 
     # Transform data to PyTorch tensors
     tensor_dataset = convert_to_tensors(dataset)
-    
-    # -------------------------------- Inspecting the Dataset --------------------------------
-    
-    print(f"\n🔹 Length of tensor_dataset: {len(tensor_dataset)}")
-    print(f"🔹 Type of tensor_dataset: {type(tensor_dataset)}\n")    
-    
-    # Inspect first sample in the dataset (voltage and current)
-    sample = tensor_dataset[0]
-    print(f"🔹 First sample in the dataset:\n{sample}\n")
 
-    # Initialize min and max tracking variables
-    min_value, max_value = float('inf'), float('-inf')
-    min_tensor, max_tensor = None, None
-
-    # Iterate over TensorDataset to find min and max values
-    for voltage, current in tensor_dataset:
-        voltage_min, current_min = voltage.min().item(), current.min().item()
-        voltage_max, current_max = voltage.max().item(), current.max().item()
-
-        # Update min and max
-        if voltage_min < min_value:
-            min_value, min_tensor = voltage_min, voltage
-        if current_min < min_value:
-            min_value, min_tensor = current_min, current
-        if voltage_max > max_value:
-            max_value, max_tensor = voltage_max, voltage
-        if current_max > max_value:
-            max_value, max_tensor = current_max, current
-
-    print(f"\n🔹 Min value in tensor_dataset: {min_value}")
-    print(f"🔹 Max value in tensor_dataset: {max_value}\n")
-
-    print("🔹 Tensor with the minimum value:\n", min_tensor, "\n")
-    print("🔹 Tensor with the maximum value:\n", max_tensor, "\n")
-    
-    #-------------------------------------Calculating the Magnetic Core Loss----------------------------
-    #Important parameters(hyperparameters maybe? <-ask this)
-    DATA_LENGTH = 8192 #400 se aytous gia kapoio logo ?????????    
-    SAMPLE_RATE = 2e-6
-    
-    core_loss_dataset = calculate_core_loss(DATA_LENGTH, SAMPLE_RATE, tensor_dataset)
-    voltage_tensor, core_loss_tensor = core_loss_dataset.tensors  # Unpack dataset tensors
-
-    print(f"\n🔹 Length of core_loss_dataset: {len(core_loss_dataset)}")
-    print(f"🔹 Voltage tensor shape: {voltage_tensor.shape}")
-    print(f"🔹 Core loss tensor shape: {core_loss_tensor.shape}\n")
-
-    # Inspect first sample in core loss dataset
-    sample = core_loss_dataset[0]
-    print(f"🔹 First sample in the core loss dataset:\n{sample}\n")
-    
-    # Apply dataset subsetting if specified using random permutation ordering e.g. tensor([523, 198, 754, 12, 899, ...])
-    if data_subset_size:
-        print(f"[INFO] Subsetting enabled. Preparing to select {data_subset_size} samples.")
-        indices = torch.randperm(len(tensor_dataset))[:data_subset_size]
+    # -------------------------------- Prevent Data Leakage: Random Subset Selection --------------------------------
+    if data_subset_size is not None:
+        indices = torch.randperm(len(tensor_dataset))[:data_subset_size]  # Random selection to avoid leakage
         tensor_dataset = torch.utils.data.Subset(tensor_dataset, indices)
-        print(f"[INFO] Using a subset of {data_subset_size} samples for training/debugging.\n")
-            
+
     # -------------------------------- Handling Scalograms & Core Loss --------------------------------
-    SAMPLE_RATE = 2e-6
+    SAMPLE_RATE = 2e-6 # 2 µs period
     scalograms_path = preprocessed_data_path / "scalograms.npy"
     core_loss_path = preprocessed_data_path / "core_loss.npy"
 
-    if use_cached_scalograms and check_cached_scalograms(preprocessed_data_path):
-        print("[INFO] Loading cached scalograms and core loss from disk.\n")
-        wavelet_dataset = WaveletCoreLossDataset(
-            scalograms_path=scalograms_path,
-            core_loss_path=core_loss_path
-        )
-    else:
-        print("[INFO] Creating WaveletCoreLossDataset and calculating scalograms and core loss.\n")
+    if use_cached_scalograms and scalograms_path.exists() and core_loss_path.exists():
+        cached_scalograms = np.load(scalograms_path)
+        cached_core_loss = np.load(core_loss_path)
+        
+        if len(cached_scalograms) >= data_subset_size:
+            print(f"[INFO] Using a subset of cached scalograms for subset size {data_subset_size}.")
+            indices = np.random.choice(len(cached_scalograms), data_subset_size, replace=False)
+            selected_scalograms = cached_scalograms[indices]
+            selected_core_loss = cached_core_loss[indices]
+            
+            np.save(scalograms_path, selected_scalograms)
+            np.save(core_loss_path, selected_core_loss)
+            
+            wavelet_dataset = WaveletCoreLossDataset(
+                scalograms_path=scalograms_path,
+                core_loss_path=core_loss_path
+            )
+        else:
+            print(f"[WARNING] Cached scalograms size {len(cached_scalograms)} is smaller than requested {data_subset_size}. Recomputing...")
+            use_cached_scalograms = False  # Force recalculation
+    
+    if not use_cached_scalograms:
+        print(f"[INFO] Calculating new scalograms for subset size {data_subset_size}.")
         wavelet_dataset = WaveletCoreLossDataset(
             V_I_dataset=tensor_dataset,
             sample_rate=SAMPLE_RATE
         )
+        np.save(scalograms_path, wavelet_dataset.scalograms.numpy())
+        np.save(core_loss_path, wavelet_dataset.core_loss_values.numpy())
+        print(f"[INFO] Saved scalograms for subset size {data_subset_size}.")
 
-        try:
-            np.save(scalograms_path, wavelet_dataset.scalograms.numpy())
-            np.save(core_loss_path, wavelet_dataset.core_loss_values.numpy())
-            print("[INFO] Scalograms and core loss saved successfully.\n")
-        except Exception as e:
-            print(f"[ERROR] Failed to save scalograms or core loss: {e}")
-        
-            
+                
     # -------------------------------- Visualize a Random Scalogram --------------------------------
     random_idx = random.randint(0, len(wavelet_dataset) - 1)  # Pick a random index
 
@@ -185,17 +149,14 @@ def main():
     plt.show(block=False)  # Show plot without blocking
     plt.pause(10)  # Keep the plot open for 10 seconds
     plt.close()  # Automatically close the plot
+    
+    print(f"🔹 Dataset Size Used for Training: {len(wavelet_dataset)}")
       
     # -------------------------------- Train/Validation/Test Split & Loading Dataloaders --------------------------------
     train_dataset, valid_dataset, test_dataset = split_dataset(wavelet_dataset)
     train_loader, valid_loader, test_loader = create_dataloaders(
         train_dataset, valid_dataset, test_dataset, batch_size=batch_size, use_gpu=use_gpu
     )
-    
-    # Move datasets to device
-    train_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in train_dataset]
-    valid_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in valid_dataset]
-    test_dataset = [(scalogram.to(device), core_loss.to(device)) for scalogram, core_loss in test_dataset]
     
     # Example DataLoader Validation
     for scalogram_batch, core_loss_batch in train_loader:
@@ -225,21 +186,18 @@ def main():
     print("🔹 Model Summary:\n")
     summary(model, input_size=(batch_size, 1, 24, 24))
     
-    # -------------------------------- Model Initialization --------------------------------
-    model = WaveletModel().to(device)
-
-    # -------------------------------- Training/Testing the Model --------------------------------
+    
+    # -------------------------------- Training the Model --------------------------------
+    
     trained_model = train_model(
         model=model,
         train_loader=train_loader,
         valid_loader=valid_loader,
         test_loader=test_loader,
-        config=config,
+        config=config,  # Now always uses correct values
         device=device
     )
-    
-    
-    
+
     
 if __name__ == "__main__":
     main()

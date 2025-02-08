@@ -1,0 +1,42 @@
+# program: main.py  # Ensure this points to the correct entry point of your script
+# method: grid  # Ensures we try all values one by one
+
+# parameters:
+#   NUM_EPOCH:
+#     values: [5, 10, 15]  # Example values to test
+#   LEARNING_RATE:
+#     values: [0.001, 0.01, 0.1]  # Testing different learning rates
+#   BATCH_SIZE:
+#     values: [16, 32, 64]  # Different batch sizes
+#   DATA_SUBSET_SIZE:
+#     values: [128, 256, 512]  # Different dataset sizes
+
+# program: main.py  # Entry point - the script that should be run
+# entity: ggeorgid  # Ensure this is set
+# project: wavelet-coreloss  # Explicitly define the project name
+# method: grid  # Ensures all hyperparameters are tested systematically
+# parameters:
+#   NUM_EPOCH:
+#     values: [5, 10, 20]
+#   BATCH_SIZE:
+#     values: [32, 64]
+#   LEARNING_RATE:
+#     values: [0.001, 0.0005]
+#   DATA_SUBSET_SIZE:
+#     values: [128, 256, 512]
+program: main.py  # Entry point - the script that should be run
+entity: ggeorgid  # Ensure this is set
+project: wavelet-coreloss  # Explicitly define the project name
+method: grid  # Default grid search
+
+parameters:
+  NUM_EPOCH:
+    values: [5, 10, 20]
+  BATCH_SIZE:
+    values: [32, 64]
+  LEARNING_RATE:
+    values: [0.001, 0.0005]
+  DATA_SUBSET_SIZE:
+    values: [128, 256, 512]
+
+

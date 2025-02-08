@@ -45,9 +45,9 @@ class WaveletCoreLossDataset(Dataset):
             # Compute scalograms using the voltage data
             self.scalograms = calculate_scalograms(
                 dataset=np.stack((voltage_data, np.zeros_like(voltage_data)), axis=2),
+                sample_rate=sample_rate,
                 wave_name=wave_name,
-                sample_length=sample_length,
-                sample_rate=sample_rate
+                sample_length=sample_length                
             )
 
             # Extract tensors

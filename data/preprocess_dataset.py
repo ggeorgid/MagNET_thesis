@@ -16,15 +16,6 @@ def check_dataset_exists(dataset_path):
     """
     return dataset_path.is_dir() and any(dataset_path.iterdir())
 
-
-def check_cached_scalograms(preprocessed_data_path):
-    """
-    Check if cached scalograms and core loss files exist.
-    """
-    scalogram_file = preprocessed_data_path / "scalograms.npy"
-    core_loss_file = preprocessed_data_path / "core_loss.npy"
-    return scalogram_file.exists() and core_loss_file.exists()
-
 def convert_to_npy(preprocessed_data_path: str, raw_data_path: str) -> None:
     """
     Load and process CSV files from a given directory, concatenate them into a single dataset,
@@ -151,9 +142,10 @@ def calculate_core_loss(datalength: int,
     return dataset
 
 def calculate_scalograms(dataset: np.ndarray, 
+                         sample_rate: float,
                          wave_name: str = 'cgau8', 
-                         sample_length: int = None,  # Default is None
-                         sample_rate: float = 200e3):
+                         sample_length: int = None):  # Default is None
+                           #=200e3
     """
     Computes scalograms from a dataset using Continuous Wavelet Transform (CWT).
     
@@ -161,7 +153,7 @@ def calculate_scalograms(dataset: np.ndarray,
         dataset (np.ndarray): Input dataset of shape (num_samples, time_steps, 2).
         wave_name (str): The wavelet type (default 'cgau8').
         sample_length (int, optional): Number of time steps to use. Defaults to full length.
-        sample_rate (float): Sampling frequency in Hz (default 200e3).
+        sample_rate (float): Sampling frequency in Hz (default 200e3). <-in question might be sample period instead
     
     Returns:
         torch.Tensor: Scalogram tensor of shape (num_samples, 1, 24, 24).
@@ -194,6 +186,7 @@ def calculate_scalograms(dataset: np.ndarray,
     for index in tqdm(range(num_samples), desc="Generating Scalograms"):
         row = dataset[index, :, 0]  # Extract voltage signal
         cwtmatr, _ = pywt.cwt(row, scales, wave_name, sample_rate)  # Wavelet transform
+        #print(f"THIS IS THE SIZE OF {cwtmatr.shape}")
         scalograms[index] = resize(abs(cwtmatr), (image_size, image_size), anti_aliasing=True)
 
     # Convert to PyTorch tensor and reshape for CNN input
