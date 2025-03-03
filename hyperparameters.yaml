@@ -1,17 +1,24 @@
-# General Settings
-SEED: 42
-USE_GPU: True
-DOWNLOAD_DATASET: True  # Checks if the user wants to download the dataset
-USE_CACHED_SCALOGRAMS: True # Checks if the user wants to use the cached scalograms 
+# -------------------- General Settings --------------------
+SEED: 567                  # Random seed for reproducibility
+USE_GPU: True             # Enable GPU acceleration if available
+DOWNLOAD_DATASET: True    # Automatically download dataset if not present
+USE_CACHED_SCALOGRAMS: True # Use precomputed scalograms if available
 
+# -------------------- Training Parameters --------------------
+NUM_EPOCH: 50             # Total number of training epochs
+BATCH_SIZE: 128           # Number of samples per batch
+LEARNING_RATE: 0.0005     # Learning rate for optimizer
 
-# Training Parameters
-NUM_EPOCH: 5
-BATCH_SIZE: 32
-LEARNING_RATE: 0.001
-DATA_SUBSET_SIZE: 128  # Set to None to use the full dataset
-#The line bellow is no longer true because we use a random permutation of the dataset to avoid data leakage(2025-02-08)
-  #Be careful with the DATA_SUBSET_SIZE parameter, you have to change USE_CACHED_SCALOGRAMS to False the first time
+DATA_SUBSET_SIZE: null  # Null -> Full dataset (now only an optional debug parameter)
 
+# ⚠️ Note: DATA_SUBSET_SIZE is only for debugging.  
+# ⚠️ If using USE_CACHED_SCALOGRAMS = False, scalograms will be **recomputed**.  
+# First-time users should ensure this is False to generate scalograms correctly.
 
+# -------------------- Sweep Hyperparameters (For Manual Runs) --------------------
+# Uncomment and modify below when testing sweeps manually
+# NUM_EPOCH: [50, 100]
+# BATCH_SIZE: [32, 64, 128]
+# LEARNING_RATE: [0.001, 0.0005]
+# DATA_SUBSET_SIZE: null  # Keep null for full dataset
 

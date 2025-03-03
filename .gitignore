@@ -64,3 +64,5 @@ dataset*.npy
 data/raw/
 *.npy
 wandb/
+*.txt
+figures/

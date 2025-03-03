@@ -700,3 +700,101 @@ else:
     np.save(scalograms_path, wavelet_dataset.scalograms.numpy())
     np.save(core_loss_path, wavelet_dataset.core_loss_values.numpy())
     print(f"[INFO] Saved scalograms for subset size {data_subset_size}.")
+    
+    
+#--------------------------------Simplified version of main.py------------------------------------------
+  
+# -------------------------------- Handling Scalograms & Core Loss --------------------------------
+    SAMPLE_RATE = 2e-6
+    wavelet_dataset = WaveletCoreLossDataset(
+        V_I_dataset=tensor_dataset,
+        sample_rate=SAMPLE_RATE
+    )
+    
+    # -------------------------------- Train/Validation/Test Split & Loading Dataloaders --------------------------------
+    train_dataset, valid_dataset, test_dataset = split_dataset(wavelet_dataset)
+    train_loader, valid_loader, test_loader = create_dataloaders(
+        train_dataset, valid_dataset, test_dataset, batch_size=batch_size, use_gpu=use_gpu
+    )
+    
+    model = WaveletModel().to(device)
+    
+    print("🔹 Model Summary:\n")
+    summary(model, input_size=(batch_size, 1, 24, 24))
+    
+    trained_model = train_model(
+        model=model,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_loader=test_loader,
+        config={
+            "NUM_EPOCH": num_epoch,
+            "DATA_SUBSET_SIZE": data_subset_size,
+            "LEARNING_RATE": lr,
+            "BATCH_SIZE": batch_size
+        },
+        device=device
+    )
+    
+#------------------------------Handling Trapezoid Time Series with 8000 samples instead of 8192--------------------------
+#The following two functions will need to be changed
+def process_csv(csv_path: str, target_length=8192) -> np.ndarray | None:
+    """
+    Reads a CSV file and converts it into a NumPy array, either trimming or padding it to `target_length`.
+
+    Args:
+        csv_path (str): Path to the CSV file.
+        target_length (int): The number of time steps to standardize all samples (default: 8192).
+    
+    Returns:
+        np.ndarray or None: Processed data if valid, otherwise None.
+    """
+    if "info.csv" in csv_path:
+        return None  # Skip metadata files
+
+    try:
+        df = pd.read_csv(csv_path, header=None, dtype=np.float64, skiprows=1).values
+        sample_length = df.shape[0]
+
+        if sample_length not in (8000, 8192):
+            print(f"[WARNING] {csv_path} has an unexpected sample length {sample_length}, skipping.")
+            return None
+
+        # Handle trimming (if too long) or padding (if too short)
+        if sample_length > target_length:
+            trimmed_data = df[:target_length]
+        elif sample_length < target_length:
+            padding = np.zeros((target_length - sample_length, df.shape[1]))
+            trimmed_data = np.vstack((df, padding))
+        else:
+            trimmed_data = df  # No modification needed
+
+        return trimmed_data.reshape(-1, target_length, trimmed_data.shape[1])
+
+    except (ValueError, IndexError, pd.errors.ParserError) as e:
+        print(f"[ERROR] Failed to process {csv_path}: {e}")
+        return None
+
+def convert_to_npy(preprocessed_data_path: Path, raw_data_path: Path, use_short=False) -> None:
+    """
+    Converts all CSV files in raw_data_path to a single NumPy dataset.
+
+    Args:
+        preprocessed_data_path (Path): Directory to save processed dataset.
+        raw_data_path (Path): Directory containing raw CSV files.
+        use_short (bool): If True, trims all time series to 8000. If False, keeps original sizes (8192).
+    """
+    csv_paths = list(raw_data_path.glob("dataset/*.csv"))
+
+    target_length = 8000 if use_short else 8192  # Determine target length dynamically
+    all_data = [process_csv(csv, target_length) for csv in csv_paths if process_csv(csv, target_length) is not None]
+
+    if not all_data:
+        raise RuntimeError("[ERROR] No valid CSV files found for dataset conversion.")
+
+    final_data = np.concatenate(all_data, axis=0)
+    np.save(preprocessed_data_path / f"dataset_{target_length}.npy", final_data)
+    print(f"[INFO] Successfully saved dataset_{target_length}.npy with shape {final_data.shape}")
+
+    
+    

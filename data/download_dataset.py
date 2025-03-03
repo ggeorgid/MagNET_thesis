@@ -1,7 +1,26 @@
 import os
 import gdown
 import tarfile
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+
+def extract_drive_file_id(url):
+    """Extracts the Google Drive file ID from various URL formats."""
+    parsed_url = urlparse(url)
+    if "drive.google.com" in url and "/d/" in url:
+        return url.split("/d/")[1].split("/")[0]
+    if "id=" in parsed_url.query:
+        return parse_qs(parsed_url.query).get("id", [None])[0]
+    return None
+
+def dataset_already_downloaded(output_file, save_dir):
+    """Checks if the dataset archive or extracted files already exist."""
+    if not Path(output_file).exists():  # ✅ First check if file exists
+        return False
+    if tarfile.is_tarfile(output_file):  # Now safe to check if it's a tar file
+        with tarfile.open(output_file, "r:gz") as tar:
+            return all(Path(save_dir, member.name).exists() for member in tar.getmembers())
+    return Path(output_file).exists()
 
 def download_dataset(url: str, save_dir: str, filename: str = None):
     """
@@ -11,74 +30,40 @@ def download_dataset(url: str, save_dir: str, filename: str = None):
     Args:
         url (str): The Google Drive shareable URL.
         save_dir (str): Directory where the file will be saved.
-        filename (str): Optional filename for the downloaded file. Defaults to None for automatic naming.
+        filename (str): Optional filename for the downloaded file.
     """
-    # Ensure the save directory exists
-    os.makedirs(save_dir, exist_ok=True)
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Extract the file ID
-    file_id = None
-    if "drive.google.com" in url and "/d/" in url:
-        # Standard Google Drive URL
-        try:
-            file_id = url.split("/d/")[1].split("/")[0]
-        except IndexError:
-            raise ValueError("Invalid Google Drive URL format.")
-    elif "drive.usercontent.google.com" in url or "id=" in url:
-        # Alternate URL format with 'id=' parameter
-        parsed_url = urlparse(url)
-        query_params = parse_qs(parsed_url.query)
-        file_id = query_params.get("id", [None])[0]
-
+    file_id = extract_drive_file_id(url)
     if not file_id:
-        raise ValueError("Could not extract file ID from the provided URL.")
+        raise ValueError("[ERROR] Invalid Google Drive URL.")
 
-    # Construct the download URL
-    download_url = f"https://drive.google.com/uc?id={file_id}"
+    output_file = save_dir / (filename if filename else f"file_{file_id}.tar.gz")
 
-    # Determine the output file path
-    output_file = os.path.join(save_dir, filename) if filename else os.path.join(save_dir, f"file_{file_id}.tar.gz")
+    if dataset_already_downloaded(output_file, save_dir):
+        print("[INFO] Dataset already exists. Skipping download and extraction.")
+        return
 
-    # Pre-check: Determine if the contents of the archive already exist
-    if tarfile.is_tarfile(output_file):
-        with tarfile.open(output_file, "r:gz") as tar:
-            all_exist = all(
-                os.path.exists(os.path.join(save_dir, member.name)) for member in tar.getmembers()
-            )
-            if all_exist:
-                print("[MagNet] All dataset files already exist. Skipping download and extraction.")
-                return
+    # Download the dataset
+    print(f"[INFO] Downloading dataset from: {url}")
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", str(output_file), quiet=False)
 
-    # Check if the file already exists (only for tar.gz downloads)
-    if os.path.exists(output_file):
-        print(f"File already exists: {output_file}. Skipping download.")
-    else:
-        # Download the file
-        print(f"Downloading from: {download_url}")
-        gdown.download(download_url, output_file, quiet=False)
-        print(f"File downloaded to: {output_file}")
-
-    # Extract the file if it's a .tar.gz archive
+    # Extract if it's a .tar.gz file
     if tarfile.is_tarfile(output_file):
         try:
             with tarfile.open(output_file, "r:gz") as tar:
-                all_exist = all(
-                    os.path.exists(os.path.join(save_dir, member.name)) for member in tar.getmembers()
-                )
-                if all_exist:
-                    print("[MagNet] Extracted files already exist. Skipping extraction.")
-                else:
-                    # Extract the files
-                    tar.extractall(save_dir)
-                    print("[MagNet] Dataset unzipped successfully.")
+                tar.extractall(save_dir)
+                print("[INFO] Dataset successfully extracted.")
+        except tarfile.TarError as e:
+            print(f"[ERROR] Failed to extract dataset: {e}")
+            return  # Stop further processing if extraction fails
+
+        # Cleanup: Delete the archive file
+        try:
+            output_file.unlink()
+            print("[INFO] Deleted archive file after extraction.")
         except Exception as e:
-            print(f"[MagNet] Error during extraction: {e}")
-        finally:
-            # Ensure the .tar.gz file is deleted
-            try:
-                os.remove(output_file)
-                print("[MagNet] Cleanup successful. Deleted archive file.")
-            except Exception as e:
-                print(f"[MagNet] Error during cleanup: {e}")
+            print(f"[WARNING] Failed to delete archive: {e}")
     else:
-        print("[MagNet] The downloaded file is not a .tar.gz archive. No extraction performed.")
+        print("[WARNING] Downloaded file is not a .tar.gz archive. No extraction performed.")
