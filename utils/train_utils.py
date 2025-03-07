@@ -6,6 +6,7 @@ import wandb
 import numpy as np  # Added for variance check
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import matplotlib.pyplot as plt  # Added for visualization
+import optuna
 
 # Ensure figures directory exists
 FIGURE_DIR = "figures"
@@ -33,19 +34,26 @@ def plot_results(y_true, y_pred, title="Predicted vs Actual Core Loss"):
     plt.savefig(os.path.join(FIGURE_DIR, "model_predictions.png"))
     plt.close()
 
-def train_model(model, train_loader, valid_loader, test_loader, config, device):
+def train_model(model, train_loader, valid_loader, test_loader, config, device, trial=None):
     """
     Trains the model and logs metrics to wandb.
     """
     use_wandb_sweep = wandb.run is not None  # Detect if inside a wandb sweep
     
-    # Initialize wandb run if not already initialized
-    if wandb.run is None:
-        wandb.init(
-            project="No_trapezoids_sweep_March3rd",
-            name=f"epochs_{config['NUM_EPOCH']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
-            config=config
-        )
+    #--------Optuna Pruning Step--------
+    #wandb.watch(model, log="all", log_freq=10)  # Log model gradients and parameters
+    best_val_loss = float("inf")
+    early_stopping_patience = 5
+    patience_counter = 0
+    #-------------------------------------
+    
+    # # Initialize wandb run if not already initialized
+    # if wandb.run is None:
+    #     wandb.init(
+    #         project="No_trapezoids_sweep_March3rd",
+    #         name=f"epochs_{config['NUM_EPOCH']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
+    #         config=config
+    #     )
     
     print("\n✅ Training with the following hyperparameters:")
     print(config)
@@ -155,9 +163,31 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device):
                f"Test R²: {test_r2:.4f} | Train MAE: {train_mae:.6f} | Validation MAE: {valid_mae:.6f} | "
                f"Test MAE: {test_mae:.6f} | Train MSE: {train_mse:.6f} | Validation MSE: {valid_mse:.6f} | "
                f"Test MSE: {test_mse:.6f}")
-    
+
+        # Report to Optuna for pruning (only if trial is provided)
+        if trial:
+            trial.report(epoch_valid_loss, epoch)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+
+        # Early stopping logic (only if trial is provided)
+        if trial:
+            if epoch_valid_loss < best_val_loss:
+                best_val_loss = epoch_valid_loss
+                patience_counter = 0
+            else:
+                patience_counter += 1
+            if patience_counter >= early_stopping_patience:
+                print(f"[INFO] Early stopping triggered at epoch {epoch}.")
+                break
+        
     torch.save(model.state_dict(), "trained_model.pth")
     
+    # Log final validation loss correctly when NOT using Optuna
+    print(f"Final Validation Loss: {epoch_valid_loss}")
+    if trial is None:
+        final_epoch_loss = epoch_valid_loss
+        
     # Save test set true and predicted values for sanity check
     np.save("y_test_true.npy", y_test_true)
     np.save("y_test_pred.npy", y_test_pred)
@@ -166,172 +196,15 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device):
     # Plot results
     plot_results(y_test_true, y_test_pred, title="Test Set Predictions")
     
-    wandb.finish()
-    
-    return model
+    # Return model and best validation loss    
+    if trial:
+        return model, best_val_loss
+    else:
+        return model, final_epoch_loss
 
 
 
 
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import wandb
-# from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
-# import matplotlib.pyplot as plt  # Added for visualization
-
-# def plot_results(y_true, y_pred):
-#     """
-#     Plots predicted vs actual core loss values and the error distribution.
-#     """
-#     plt.figure(figsize=(10, 5))
-    
-#     # Scatter Plot: Predicted vs Actual
-#     plt.subplot(1, 2, 1)
-#     plt.scatter(y_true, y_pred, alpha=0.6, edgecolors='b')
-#     plt.plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--')
-#     plt.xlabel('Actual Core Loss')
-#     plt.ylabel('Predicted Core Loss')
-#     plt.title('Predicted vs Actual Core Loss')
-    
-#     # Error Distribution Plot
-#     plt.subplot(1, 2, 2)
-#     errors = y_pred - y_true
-#     plt.hist(errors, bins=20, edgecolor='black')
-#     plt.xlabel('Prediction Error')
-#     plt.ylabel('Frequency')
-#     plt.title('Error Distribution')
-    
-#     plt.tight_layout()
-#     plt.show(block=False)
-#     plt.pause(10)
-#     plt.close()
-
-# def train_model(model, train_loader, valid_loader, test_loader, config, device):
-#     """
-#     Trains the model and logs metrics to wandb.
-#     """
-#     use_wandb_sweep = wandb.run is not None  # Detect if inside a wandb sweep
-    
-#     # Initialize wandb run if not already initialized
-#     if wandb.run is None:
-#         wandb.init(
-#             project="full_dataset_attempt2",
-#             name=f"epochs_{config['NUM_EPOCH']}_subset_{config['DATA_SUBSET_SIZE']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
-#             config=config
-#         )
-    
-#     # If using a sweep, override hyperparameters
-#     if use_wandb_sweep:
-#         config["NUM_EPOCH"] = wandb.config.NUM_EPOCH
-#         config["DATA_SUBSET_SIZE"] = wandb.config.DATA_SUBSET_SIZE
-#         config["LEARNING_RATE"] = wandb.config.LEARNING_RATE
-#         config["BATCH_SIZE"] = wandb.config.BATCH_SIZE
-    
-#     print("\n✅ Training with the following hyperparameters:")
-#     print(config)
-    
-#     # Define loss function and optimizer
-#     criterion = nn.MSELoss()
-#     optimizer = optim.Adam(model.parameters(), lr=config["LEARNING_RATE"])
-#     num_epochs = config["NUM_EPOCH"]
-    
-#     for epoch in range(1, num_epochs + 1):
-#         # Training Phase
-#         model.train()
-#         epoch_train_loss = 0
-#         y_train_true, y_train_pred = [], []
-        
-#         for scalograms, core_loss in train_loader:
-#             scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-            
-#             optimizer.zero_grad()
-#             outputs = model(scalograms)
-#             loss = criterion(outputs, core_loss)
-#             loss.backward()
-#             optimizer.step()
-            
-#             epoch_train_loss += loss.item() * scalograms.size(0) / len(train_loader.dataset)#Xrhsto explain this, if it's correct
-#             y_train_true.append(core_loss.detach().cpu())
-#             y_train_pred.append(outputs.detach().cpu())
-        
-#         # Validation Phase
-#         model.eval()
-#         epoch_valid_loss = 0
-#         y_valid_true, y_valid_pred = [], []
-        
-#         with torch.inference_mode():
-#             for scalograms, core_loss in valid_loader:
-#                 scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-#                 outputs = model(scalograms)
-#                 loss = criterion(outputs, core_loss)
-#                 epoch_valid_loss += loss.item() * scalograms.size(0) / len(valid_loader.dataset)#Xrhsto explain this, if it's correct
-                
-#                 y_valid_true.append(core_loss.cpu())
-#                 y_valid_pred.append(outputs.cpu())
-        
-#         # Compute Metrics for Train and Validation Sets
-#         y_train_true = torch.cat(y_train_true).numpy()
-#         y_train_pred = torch.cat(y_train_pred).numpy()
-#         y_valid_true = torch.cat(y_valid_true).numpy()
-#         y_valid_pred = torch.cat(y_valid_pred).numpy()
-        
-#         train_r2 = r2_score(y_train_true, y_train_pred)
-#         valid_r2 = r2_score(y_valid_true, y_valid_pred)
-#         train_mae = mean_absolute_error(y_train_true, y_train_pred)
-#         valid_mae = mean_absolute_error(y_valid_true, y_valid_pred)
-#         train_mse = mean_squared_error(y_train_true, y_train_pred)
-#         valid_mse = mean_squared_error(y_valid_true, y_valid_pred)
-        
-#         # Test Phase #Xrhsto explain this, if it's correct, check if we do the whole test block correctly
-#         model.eval()
-#         test_loss = 0
-#         y_test_true, y_test_pred = [], []
-#         with torch.inference_mode():
-#             for scalograms, core_loss in test_loader:
-#                 scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-#                 predictions = model(scalograms)
-#                 loss = criterion(predictions, core_loss)
-#                 test_loss += loss.item() * scalograms.size(0)
-#                 y_test_true.append(core_loss.cpu())
-#                 y_test_pred.append(predictions.cpu())
-        
-#         test_loss /= len(test_loader.dataset)  # Normalize like train/valid
-#         y_test_true = torch.cat(y_test_true, dim=0).numpy()
-#         y_test_pred = torch.cat(y_test_pred, dim=0).numpy()
-#         test_r2 = r2_score(y_test_true, y_test_pred)
-#         test_mae = mean_absolute_error(y_test_true, y_test_pred)
-#         test_mse = mean_squared_error(y_test_true, y_test_pred)
-        
-#         # Log metrics to wandb
-#         wandb.log({
-#             "_step": epoch,
-#             "epoch": epoch,
-#             "Loss/Train": epoch_train_loss,
-#             "Loss/Validation": epoch_valid_loss,
-#             "Loss/Test": test_loss,
-#             "MSE/Train": train_mse,
-#             "MSE/Validation": valid_mse,
-#             "MSE/Test": test_mse,
-#             "MAE/Train": train_mae,
-#             "MAE/Validation": valid_mae,
-#             "MAE/Test": test_mae,
-#             "R2/Train": train_r2,
-#             "R2/Validation": valid_r2,
-#             "R2/Test": test_r2
-#         })
-        
-#         print(f"Epoch {epoch:02d} | Train Loss: {epoch_train_loss:.6f} | Validation Loss: {epoch_valid_loss:.6f} | "
-#               f"Test Loss: {test_loss:.6f} | Train R²: {train_r2:.4f} | Validation R²: {valid_r2:.4f} | "
-#               f"Test R²: {test_r2:.4f} | Train MAE: {train_mae:.6f} | Validation MAE: {valid_mae:.6f} | "
-#               f"Test MAE: {test_mae:.6f} | Train MSE: {train_mse:.6f} | Validation MSE: {valid_mse:.6f} | "
-#               f"Test MSE: {test_mse:.6f}")
-    
-#     plot_results(y_test_true, y_test_pred)
-#     torch.save(model.state_dict(), "trained_model.pth")
-#     wandb.finish()
-    
-#     return model
 
 
 

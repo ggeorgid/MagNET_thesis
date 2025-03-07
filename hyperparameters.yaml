@@ -1,5 +1,5 @@
 # -------------------- General Settings --------------------
-SEED: 567                  # Random seed for reproducibility
+SEED: 42                  # Random seed for reproducibility
 USE_GPU: True             # Enable GPU acceleration if available
 DOWNLOAD_DATASET: True    # Automatically download dataset if not present
 USE_CACHED_SCALOGRAMS: True # Use precomputed scalograms if available

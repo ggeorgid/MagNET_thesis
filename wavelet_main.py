@@ -6,6 +6,9 @@ import random
 import yaml
 import matplotlib
 import os
+import wandb
+import optuna
+import json
 matplotlib.use("Agg")  # Use Qt6 because TkAgg had conflicts with num_of_workers variable
 import matplotlib.pyplot as plt
 from torchinfo import summary
@@ -20,13 +23,68 @@ from wavelet_model import WaveletModel
 from utils.train_utils import train_model
 
 def parse_args():
-    """Parse command-line arguments to override YAML hyperparameters."""
-    parser = argparse.ArgumentParser(description="Run Wavelet Model Training")
+    """Parse command-line arguments to override YAML hyperparameters or trigger Optuna optimization."""
+    parser = argparse.ArgumentParser(description="Run Wavelet Model Training or Optuna Optimization")
     parser.add_argument("--num_epoch", type=int, help="Number of epochs")
     parser.add_argument("--data_subset_size", type=int, help="Subset size of dataset")
     parser.add_argument("--learning_rate", type=float, help="Learning rate")
     parser.add_argument("--batch_size", type=int, help="Batch size")
+    parser.add_argument("--optimize", action="store_true", help="Run Optuna optimization")
     return parser.parse_args()
+    
+def objective(trial, config, device, train_loader, valid_loader, test_loader):
+    # Suggest hyperparameters
+    config["NUM_EPOCH"] = trial.suggest_int("num_epoch", 10, 50)
+    config["BATCH_SIZE"] = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
+    config["LEARNING_RATE"] = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+
+    print(f"\n🔹 Running trial with: NUM_EPOCH={config['NUM_EPOCH']}, BATCH_SIZE={config['BATCH_SIZE']}, LEARNING_RATE={config['LEARNING_RATE']}")
+
+    # Initialize wandb run
+    wandb.init(
+        project="optuna_attempt2_March4th",
+        name=f"trial_{trial.number}_epochs_{config['NUM_EPOCH']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
+        config=config
+    )
+
+    model = WaveletModel().to(device)
+    trained_model, best_val_loss = train_model(
+        model=model,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_loader=test_loader,
+        config=config,
+        device=device,
+        trial=trial  # Pass trial for pruning
+    )
+
+    # Log final validation loss
+    wandb.log({"Loss/Validation": best_val_loss})
+    wandb.finish()
+
+    return best_val_loss
+    
+def run_training(config, device, train_loader, valid_loader, test_loader):
+    # Initialize wandb run
+    wandb.init(
+        project="With_Trapezoids_sweep_March7th",
+        name=f"epochs_{config['NUM_EPOCH']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
+        config=config
+    )
+
+    model = WaveletModel().to(device)
+    trained_model, best_val_loss = train_model(
+        model=model,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        test_loader=test_loader,
+        config=config,
+        device=device
+    )
+
+    # Log final validation loss
+    wandb.log({"Loss/Validation": best_val_loss})
+    wandb.finish()  
     
 def main():    
     
@@ -156,38 +214,38 @@ def main():
     print(f"[INFO] Created WaveletCoreLossDataset with {len(wavelet_dataset)} samples.")
 
     #----------------Inspecting Scalograms-CoreLoss Dataset----------------------------------------
-    # Print first 5 sample scalograms and core loss values
-    # for i in range(5):
-    #     scalogram, core_loss = wavelet_dataset[i]  # Get dataset sample
+    #Print first 5 sample scalograms and core loss values
+    for i in range(5):
+        scalogram, core_loss = wavelet_dataset[i]  # Get dataset sample
 
-    #     print(f"\n🔹 [DEBUG] Sample {i}:")
-    #     print(f"   - Scalogram Shape: {scalogram.shape} (Expected: [1, 24, 24])")
-    #     print(f"   - Core Loss Value: {core_loss.item()}")
+        print(f"\n🔹 [DEBUG] Sample {i}:")
+        print(f"   - Scalogram Shape: {scalogram.shape} (Expected: [1, 24, 24])")
+        print(f"   - Core Loss Value: {core_loss.item()}")
 
-    #     # Print a small section of the scalogram (first 3×3 block)
-    #     print(f"   - Scalogram Sample Values (first 3×3 block):\n{scalogram.squeeze().numpy()[:3, :3]}")
+        # Print a small section of the scalogram (first 3×3 block)
+        print(f"   - Scalogram Sample Values (first 3×3 block):\n{scalogram.squeeze().numpy()[:3, :3]}")
         
-    # Compute statistics
-    # core_loss_values = np.array([wavelet_dataset[i][1].item() for i in range(len(wavelet_dataset))])
+    #Compute statistics
+    core_loss_values = np.array([wavelet_dataset[i][1].item() for i in range(len(wavelet_dataset))])
 
-    # print("\n🔹 [DEBUG] Core Loss Dataset Statistics:")
-    # print(f"   - Mean: {np.mean(core_loss_values)}")
-    # print(f"   - Min: {np.min(core_loss_values)}")
-    # print(f"   - Max: {np.max(core_loss_values)}")
-    # print(f"   - Std Dev: {np.std(core_loss_values)}")
+    print("\n🔹 [DEBUG] Core Loss Dataset Statistics:")
+    print(f"   - Mean: {np.mean(core_loss_values)}")
+    print(f"   - Min: {np.min(core_loss_values)}")
+    print(f"   - Max: {np.max(core_loss_values)}")
+    print(f"   - Std Dev: {np.std(core_loss_values)}")
     
-    # # Extract 5 random samples and check their scalogram shapes
-    # random_indices = np.random.choice(len(wavelet_dataset), 5, replace=False)
+    # Extract 5 random samples and check their scalogram shapes
+    random_indices = np.random.choice(len(wavelet_dataset), 5, replace=False)
 
-    # for idx in random_indices:
-    #     scalogram, core_loss = wavelet_dataset[idx]
+    for idx in random_indices:
+        scalogram, core_loss = wavelet_dataset[idx]
         
-    #     print(f"\n🔹 [DEBUG] Random Sample {idx}:")
-    #     print(f"   - Scalogram Shape: {scalogram.shape}")
-    #     print(f"   - Core Loss Value: {core_loss.item()}")
+        print(f"\n🔹 [DEBUG] Random Sample {idx}:")
+        print(f"   - Scalogram Shape: {scalogram.shape}")
+        print(f"   - Core Loss Value: {core_loss.item()}")
 
-    #     # Check mean and variance of the scalogram
-    #     print(f"   - Scalogram Mean: {scalogram.mean().item()}, Variance: {scalogram.var().item()}")
+        # Check mean and variance of the scalogram
+        print(f"   - Scalogram Mean: {scalogram.mean().item()}, Variance: {scalogram.var().item()}")
         
             
     # ---------------------- Visualize a Random Scalogram ----------------------
@@ -233,43 +291,43 @@ def main():
         use_gpu=config["USE_GPU"]
     )
     
-    # ✅ Check dataloader sizes to see if they are the same as the dataset split sizes
-    # print(f"🔹 [DEBUG] Train DataLoader Size: {len(train_loader.dataset)} (Expected: {len(train_dataset)})")
-    # print(f"🔹 [DEBUG] Valid DataLoader Size: {len(valid_loader.dataset)} (Expected: {len(valid_dataset)})")
-    # print(f"🔹 [DEBUG] Test DataLoader Size: {len(test_loader.dataset)} (Expected: {len(test_dataset)})")
+    #✅ Check dataloader sizes to see if they are the same as the dataset split sizes
+    print(f"🔹 [DEBUG] Train DataLoader Size: {len(train_loader.dataset)} (Expected: {len(train_dataset)})")
+    print(f"🔹 [DEBUG] Valid DataLoader Size: {len(valid_loader.dataset)} (Expected: {len(valid_dataset)})")
+    print(f"🔹 [DEBUG] Test DataLoader Size: {len(test_loader.dataset)} (Expected: {len(test_dataset)})")
     
-    # # Inspect each DataLoader
-    # inspect_dataloader(train_loader, "Train DataLoader")
-    # inspect_dataloader(valid_loader, "Validation DataLoader")
-    # inspect_dataloader(test_loader, "Test DataLoader")
+    # Inspect each DataLoader
+    inspect_dataloader(train_loader, "Train DataLoader")
+    inspect_dataloader(valid_loader, "Validation DataLoader")
+    inspect_dataloader(test_loader, "Test DataLoader")
     
     # Check each DataLoader's core loss distribution
     check_dataloader_distribution(train_loader, wavelet_dataset, "Train DataLoader")
     check_dataloader_distribution(valid_loader, wavelet_dataset, "Validation DataLoader")
     check_dataloader_distribution(test_loader, wavelet_dataset, "Test DataLoader")
     
-    # Check reproducibility to ensure the seed works correctly
+    # # Check reproducibility to ensure the seed works correctly
     # check_reproducibility(train_loader, "Train DataLoader", seed=config["SEED"])
     # check_reproducibility(valid_loader, "Validation DataLoader", seed=config["SEED"])
     # check_reproducibility(test_loader, "Test DataLoader", seed=config["SEED"])
     
-   
-
+        
     
-    # ---------------------- Model Training ----------------------
-    model = WaveletModel().to(device)
-    trained_model = train_model(
-        model=model,
-        train_loader=train_loader,
-        valid_loader=valid_loader,
-        test_loader=test_loader,
-        config=config,
-        device=device
-    )
+    #-------------------------------Deciding to train the model or run Optuna optimization---------------------
+    if args.optimize:
+        # Run Optuna optimization
+        study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
+        study.optimize(lambda trial: objective(trial, config, device, train_loader, valid_loader, test_loader), n_trials=50) #Change n_trials to change the number of trials
+        print("\n✅ Best Hyperparameters:", study.best_params)
+        with open("best_hyperparameters.json", "w") as f:
+            json.dump(study.best_params, f)
+        print("✅ Best hyperparameters saved to best_hyperparameters.json")
+    else:
+        # Single run with specified hyperparameters
+        run_training(config, device, train_loader, valid_loader, test_loader)
     
     
-    
-    
+        
     # ---------------------- Clean Up ----------------------
     train_indices_file = preprocessed_data_path / "train_indices.npy"
     valid_indices_file = preprocessed_data_path / "valid_indices.npy"

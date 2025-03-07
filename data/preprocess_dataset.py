@@ -32,54 +32,116 @@ def check_dataset_exists(dataset_path, check_for_npy=True):
         print("[INFO] Raw dataset directory is empty.")
         return False
 
+# The following two functions have been updated to handle the new dataset structure
+# and to ensure that the sample length is consistent across all samples. 
+# Total dataset size went from [5762,8192,2] to [9936,8000,2].
+# def process_csv(csv_path: str) -> np.ndarray | None:
+#     """
+#     Reads a CSV file and converts it into a NumPy array.
+    
+#     Args:
+#         csv_path (str): Path to the CSV file.
+    
+#     Returns:
+#         np.ndarray or None: Processed data if valid, otherwise None.
+#     """
+#     if "info.csv" in str(csv_path):  # ✅ Convert Path to string
+#         return None
+    
+#     try:
+#         df = pd.read_csv(csv_path, header=None, dtype={0: str, 1: np.float64})
+#         sample_period, sample_length = df.iloc[0]
+#         sample_length = int(sample_length)
+        
+#         if sample_length != 8192:
+#             print(f"[WARNING] {csv_path} has unexpected sample length {sample_length}, skipping.")
+#             return None
+
+#         data = df.iloc[1:].values.astype(np.float64)
+#         num_samples = data.shape[0] // sample_length
+
+#         return data.reshape(num_samples, sample_length, -1)
+    
+#     except (ValueError, IndexError) as e:
+#         print(f"[ERROR] Failed to process {csv_path}: {e}")
+#         return None
+
+# def convert_to_npy(preprocessed_data_path: Path, raw_data_path: Path) -> None:
+#     """
+#     Converts all CSV files in raw_data_path to a single NumPy dataset.
+    
+#     Args:
+#         preprocessed_data_path (Path): Directory to save processed dataset.
+#         raw_data_path (Path): Directory containing raw CSV files.
+#     """
+#     csv_paths = list(raw_data_path.glob("dataset/*.csv"))
+#     all_data = [process_csv(csv) for csv in csv_paths if process_csv(csv) is not None]
+
+#     if not all_data:
+#         raise RuntimeError("[ERROR] No valid CSV files found for dataset conversion.")
+
+#     final_data = np.concatenate(all_data, axis=0)
+#     np.save(preprocessed_data_path / "dataset.npy", final_data)
+#     print("[INFO] Successfully saved dataset.npy")
+
+
 def process_csv(csv_path: str) -> np.ndarray | None:
     """
-    Reads a CSV file and converts it into a NumPy array.
-    
-    Args:
-        csv_path (str): Path to the CSV file.
-    
-    Returns:
-        np.ndarray or None: Processed data if valid, otherwise None.
+    Reads a CSV file and converts it into a NumPy array while ensuring consistent length based on the shortest sample.
     """
-    if "info.csv" in str(csv_path):  # ✅ Convert Path to string
+    if "info.csv" in str(csv_path):
         return None
+    
+    print(f"[DEBUG] Processing file: {csv_path}")
     
     try:
         df = pd.read_csv(csv_path, header=None, dtype={0: str, 1: np.float64})
         sample_period, sample_length = df.iloc[0]
         sample_length = int(sample_length)
         
-        if sample_length != 8192:
-            print(f"[WARNING] {csv_path} has unexpected sample length {sample_length}, skipping.")
-            return None
-
+        print(f"[DEBUG] {csv_path} -> Sample Period: {sample_period}, Sample Length: {sample_length}")
+        
         data = df.iloc[1:].values.astype(np.float64)
         num_samples = data.shape[0] // sample_length
-
-        return data.reshape(num_samples, sample_length, -1)
+        
+        print(f"[DEBUG] {csv_path} -> Data Shape Before Reshaping: {data.shape}")
+        
+        data = data.reshape(num_samples, sample_length, -1)
+        
+        print(f"[DEBUG] {csv_path} -> Data Shape After Reshaping: {data.shape}")
+        
+        return data, sample_length
     
     except (ValueError, IndexError) as e:
         print(f"[ERROR] Failed to process {csv_path}: {e}")
-        return None
+        return None, None
 
 def convert_to_npy(preprocessed_data_path: Path, raw_data_path: Path) -> None:
     """
-    Converts all CSV files in raw_data_path to a single NumPy dataset.
-    
-    Args:
-        preprocessed_data_path (Path): Directory to save processed dataset.
-        raw_data_path (Path): Directory containing raw CSV files.
+    Converts all CSV files in raw_data_path to a single NumPy dataset, adjusting all time series to the shortest length.
     """
     csv_paths = list(raw_data_path.glob("dataset/*.csv"))
-    all_data = [process_csv(csv) for csv in csv_paths if process_csv(csv) is not None]
+    print(f"[DEBUG] Found CSV files: {csv_paths}")
+    processed_data = [process_csv(csv) for csv in csv_paths]
+    
+    # ✅ Filter out None values **before** unpacking
+    processed_data = [entry for entry in processed_data if entry is not None]
 
-    if not all_data:
+    if not processed_data:
         raise RuntimeError("[ERROR] No valid CSV files found for dataset conversion.")
 
+    # ✅ Unpack only valid entries
+    all_data, all_lengths = zip(*processed_data)
+
+    min_length = min(all_lengths)
+    print(f"[INFO] Shortest time series length found: {min_length}. Truncating all to this length.")
+    
+    all_data = [data[:, :min_length, :] for data in all_data]
+    
     final_data = np.concatenate(all_data, axis=0)
     np.save(preprocessed_data_path / "dataset.npy", final_data)
-    print("[INFO] Successfully saved dataset.npy")
+    print(f"[INFO] Successfully saved dataset.npy with shape {final_data.shape}")
+
 
 def convert_to_tensors(dataset: np.ndarray, device="cpu") -> torch.utils.data.TensorDataset:
     """
