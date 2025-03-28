@@ -14,10 +14,10 @@ batch_sizes = [32, 64, 128, 256]
 for lr, batch_size in itertools.product(learning_rates, batch_sizes):
     print(f"🔹 Running with: NUM_EPOCH={num_epochs[0]}, LEARNING_RATE={lr}, BATCH_SIZE={batch_size}")
 
-    # Call wavelet_main.py and stream output in real-time
+    # Call ablation_main.py and stream output in real-time
     process = subprocess.Popen(
         [
-            python_cmd, "wavelet_main.py",
+            python_cmd, "ablation_main.py",
             "--num_epoch", str(num_epochs[0]),
             "--learning_rate", str(lr),
             "--batch_size", str(batch_size)
@@ -42,25 +42,3 @@ for lr, batch_size in itertools.product(learning_rates, batch_sizes):
         print(f"✅ Completed run: NUM_EPOCH={num_epochs[0]}, LEARNING_RATE={lr}, BATCH_SIZE={batch_size}\n")
     else:
         print(f"❌ Run failed with error code {process.returncode}\n")
-        
-        
-# The automated wandb sweep setting was not working because agent was not initializing properly.
-# Here is the code for consistency. 
-# program: main.py  # Ensure the correct entry point for the sweep
-# method: grid
-
-# project: sweep_experiment  # <-- Add this line to explicitly define project name
-
-# metric:
-#   name: validation_loss  # The metric we optimize
-#   goal: minimize
-
-# parameters:
-#   NUM_EPOCH:
-#     values: [50]
-#   DATA_SUBSET_SIZE:
-#     values: [128, 256, 1024, 4096]
-#   LEARNING_RATE:
-#     values: [0.001, 0.0005]
-#   BATCH_SIZE:
-#     values: [32, 64]

@@ -797,4 +797,55 @@ def convert_to_npy(preprocessed_data_path: Path, raw_data_path: Path, use_short=
     print(f"[INFO] Successfully saved dataset_{target_length}.npy with shape {final_data.shape}")
 
     
+#--------------------Older way of creating the .npy dataset before adding the trapezoid time series-------------------
+# The following two functions have been updated to handle the new dataset structure
+# and to ensure that the sample length is consistent across all samples. 
+# Total dataset size went from [5762,8192,2] to [9936,8000,2].
+def process_csv(csv_path: str) -> np.ndarray | None:
+    """
+    Reads a CSV file and converts it into a NumPy array.
     
+    Args:
+        csv_path (str): Path to the CSV file.
+    
+    Returns:
+        np.ndarray or None: Processed data if valid, otherwise None.
+    """
+    if "info.csv" in str(csv_path):  # ✅ Convert Path to string
+        return None
+    
+    try:
+        df = pd.read_csv(csv_path, header=None, dtype={0: str, 1: np.float64})
+        sample_period, sample_length = df.iloc[0]
+        sample_length = int(sample_length)
+        
+        if sample_length != 8192:
+            print(f"[WARNING] {csv_path} has unexpected sample length {sample_length}, skipping.")
+            return None
+
+        data = df.iloc[1:].values.astype(np.float64)
+        num_samples = data.shape[0] // sample_length
+
+        return data.reshape(num_samples, sample_length, -1)
+    
+    except (ValueError, IndexError) as e:
+        print(f"[ERROR] Failed to process {csv_path}: {e}")
+        return None
+
+def convert_to_npy(preprocessed_data_path: Path, raw_data_path: Path) -> None:
+    """
+    Converts all CSV files in raw_data_path to a single NumPy dataset.
+    
+    Args:
+        preprocessed_data_path (Path): Directory to save processed dataset.
+        raw_data_path (Path): Directory containing raw CSV files.
+    """
+    csv_paths = list(raw_data_path.glob("dataset/*.csv"))
+    all_data = [process_csv(csv) for csv in csv_paths if process_csv(csv) is not None]
+
+    if not all_data:
+        raise RuntimeError("[ERROR] No valid CSV files found for dataset conversion.")
+
+    final_data = np.concatenate(all_data, axis=0)
+    np.save(preprocessed_data_path / "dataset.npy", final_data)
+    print("[INFO] Successfully saved dataset.npy")

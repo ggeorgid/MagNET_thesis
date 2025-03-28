@@ -12,27 +12,48 @@ import optuna
 FIGURE_DIR = "figures"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
-def plot_results(y_true, y_pred, title="Predicted vs Actual Core Loss"):
-    """Plots and saves predicted vs actual core loss and error distribution."""
-    plt.figure(figsize=(10, 5))
-    plt.subplot(1, 2, 1)
-    plt.scatter(y_true, y_pred, alpha=0.6, edgecolors='b')
-    plt.plot([min(y_true), max(y_true)], [min(y_true), max(y_true)], 'r--')  # Diagonal line
-    plt.xlabel('Actual Core Loss')
-    plt.ylabel('Predicted Core Loss')
-    plt.title(title)
-
-    # Error Distribution Plot
-    plt.subplot(1, 2, 2)
+def plot_results(y_true, y_pred, relative_errors, are, title="Core Loss Prediction Results"):
+    """Plots and saves a figure with three subplots: Measured vs Predicted, Relative Error vs Measured, and Error Distribution."""
+    plt.figure(figsize=(15, 5))
+    
+    # Subplot 1: Measured vs Predicted Core Loss
+    plt.subplot(1, 3, 1)
+    plt.scatter(y_true, y_pred, alpha=0.6, edgecolors='b', label='Predictions')
+    min_val = min(min(y_true), min(y_pred))
+    max_val = max(max(y_true), max(y_pred))
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+    plt.xlabel('Measured Core Loss [W]')
+    plt.ylabel('Predicted Core Loss [W]')
+    plt.title('Measured vs Predicted')
+    plt.legend()
+    plt.grid(True)
+    
+    # Subplot 2: Relative Error vs Measured Core Loss
+    plt.subplot(1, 3, 2)
+    plt.scatter(y_true, relative_errors, alpha=0.6, edgecolors='b', label='Relative Errors')
+    #plt.axhline(y=are, color='black', linestyle='--', label=f'Avg. = {are:.2f}%')
+    plt.axhline(y=np.mean(relative_errors), color='r', linestyle='--', label=f"Avg = {np.mean(relative_errors):.2f}%")
+    plt.xlabel('Measured Core Loss [W]')
+    plt.ylabel('Relative Error [%]')
+    plt.title('Relative Error Distribution')
+    plt.legend()
+    plt.grid(True)
+    # Set y-axis limits to 0-50
+    plt.ylim(0, 50)
+    
+    # Subplot 3: Error Distribution (Histogram)
+    plt.subplot(1, 3, 3)
     errors = y_pred - y_true
     plt.hist(errors, bins=20, edgecolor='black')
-    plt.xlabel('Prediction Error')
+    plt.xlabel('Prediction Error [W]')
     plt.ylabel('Frequency')
     plt.title('Error Distribution')
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(FIGURE_DIR, "model_predictions.png"))
+    
+    plt.suptitle(title)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig(os.path.join(FIGURE_DIR, "core_loss_predictions.png"))
     plt.close()
+
 
 def train_model(model, train_loader, valid_loader, test_loader, config, device, trial=None):
     """
@@ -46,15 +67,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     early_stopping_patience = 5
     patience_counter = 0
     #-------------------------------------
-    
-    # # Initialize wandb run if not already initialized
-    # if wandb.run is None:
-    #     wandb.init(
-    #         project="No_trapezoids_sweep_March3rd",
-    #         name=f"epochs_{config['NUM_EPOCH']}_lr_{config['LEARNING_RATE']}_bs_{config['BATCH_SIZE']}",
-    #         config=config
-    #     )
-    
+           
     print("\n✅ Training with the following hyperparameters:")
     print(config)
     
@@ -71,22 +84,23 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     optimizer = optim.Adam(model.parameters(), lr=config["LEARNING_RATE"])
     num_epochs = config["NUM_EPOCH"]
     
+    # Training loop
     for epoch in range(1, num_epochs + 1):
         # Training Phase
         model.train()
         epoch_train_loss = 0
         y_train_true, y_train_pred = [], []
         
-        for scalograms, core_loss in train_loader:
-            scalograms, core_loss = scalograms.to(device), core_loss.to(device)
+        for inputs, core_loss in train_loader:
+            inputs, core_loss = inputs.to(device), core_loss.to(device)
             
             optimizer.zero_grad()
-            outputs = model(scalograms)
+            outputs = model(inputs)
             loss = criterion(outputs, core_loss)
             loss.backward()
             optimizer.step()
             
-            epoch_train_loss += loss.item() * scalograms.size(0) / len(train_loader.dataset)
+            epoch_train_loss += loss.item() * inputs.size(0) / len(train_loader.dataset)
             y_train_true.append(core_loss.detach().cpu())
             y_train_pred.append(outputs.detach().cpu())
         
@@ -96,11 +110,11 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         y_valid_true, y_valid_pred = [], []
         
         with torch.inference_mode():
-            for scalograms, core_loss in valid_loader:
-                scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-                outputs = model(scalograms)
+            for inputs, core_loss in valid_loader:
+                inputs, core_loss = inputs.to(device), core_loss.to(device)
+                outputs = model(inputs)
                 loss = criterion(outputs, core_loss)
-                epoch_valid_loss += loss.item() * scalograms.size(0) / len(valid_loader.dataset)
+                epoch_valid_loss += loss.item() * inputs.size(0) / len(valid_loader.dataset)
                 
                 y_valid_true.append(core_loss.cpu())
                 y_valid_pred.append(outputs.cpu())
@@ -110,11 +124,11 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         y_test_true, y_test_pred = [], []
         
         with torch.inference_mode():
-            for scalograms, core_loss in test_loader:
-                scalograms, core_loss = scalograms.to(device), core_loss.to(device)
-                outputs = model(scalograms)
+            for inputs, core_loss in test_loader:
+                inputs, core_loss = inputs.to(device), core_loss.to(device)
+                outputs = model(inputs)
                 loss = criterion(outputs, core_loss)
-                epoch_test_loss += loss.item() * scalograms.size(0) / len(test_loader.dataset)
+                epoch_test_loss += loss.item() * inputs.size(0) / len(test_loader.dataset)
                 
                 y_test_true.append(core_loss.cpu())
                 y_test_pred.append(outputs.cpu())
@@ -140,6 +154,19 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         valid_mse = mean_squared_error(y_valid_true, y_valid_pred)
         test_mse = mean_squared_error(y_test_true, y_test_pred)
 
+        # Compute Relative Errors and ARE
+        epsilon = 0.001  # Avoid division by zero        
+        # Train set ARE
+        relative_errors_train = np.abs(y_train_pred - y_train_true) / (y_train_true + epsilon) * 100
+        train_are = np.mean(relative_errors_train)
+        # Validation set ARE
+        relative_errors_valid = np.abs(y_valid_pred - y_valid_true) / (y_valid_true + epsilon) * 100
+        valid_are = np.mean(relative_errors_valid)
+        # Test set ARE
+        relative_errors = np.abs(y_test_pred - y_test_true) / (y_test_true + epsilon) * 100
+        test_are = np.mean(relative_errors)
+        
+        
         # Log metrics to wandb
         wandb.log({
             "_step": epoch,
@@ -156,13 +183,17 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
             "R2/Train": train_r2,
             "R2/Validation": valid_r2,
             "R2/Test": test_r2,
+            "ARE/Train": train_are,
+            "ARE/Validation": valid_are,
+            "ARE/Test": test_are,
         })
         
         print(f"Epoch {epoch:02d} | Train Loss: {epoch_train_loss:.6f} | Validation Loss: {epoch_valid_loss:.6f} | "
                f"Test Loss: {epoch_test_loss:.6f} | Train R²: {train_r2:.4f} | Validation R²: {valid_r2:.4f} | "
                f"Test R²: {test_r2:.4f} | Train MAE: {train_mae:.6f} | Validation MAE: {valid_mae:.6f} | "
                f"Test MAE: {test_mae:.6f} | Train MSE: {train_mse:.6f} | Validation MSE: {valid_mse:.6f} | "
-               f"Test MSE: {test_mse:.6f}")
+               f"Test MSE: {test_mse:.6f} | Train ARE: {train_are:.2f}% | Validation ARE: {valid_are:.2f}% | "
+               f"Test ARE: {test_are:.2f}%")                
 
         # Report to Optuna for pruning (only if trial is provided)
         if trial:
@@ -194,7 +225,13 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     print("\n✅ Saved y_test_true.npy and y_test_pred.npy for sanity check.")
     
     # Plot results
-    plot_results(y_test_true, y_test_pred, title="Test Set Predictions")
+    plot_results(
+        y_test_true,
+        y_test_pred,
+        relative_errors,
+        test_are,
+        title="Core Loss Prediction Results on Test Set"
+    )
     
     # Return model and best validation loss    
     if trial:
@@ -208,10 +245,10 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
 
 
 
-# scalograms.size(0) is the first dimension of the scalograms tensor, which is the batch size for each batch.
+# inputs.size(0) is the first dimension of the inputs tensor, which is the batch size for each batch.
 
-#epoch_train_loss += loss.item() * scalograms.size(0) / len(train_loader.dataset)
-#epoch_valid_loss += loss.item() * scalograms.size(0) / len(valid_loader.dataset)
+#epoch_train_loss += loss.item() * inputs.size(0) / len(train_loader.dataset)
+#epoch_valid_loss += loss.item() * inputs.size(0) / len(valid_loader.dataset)
 
 # Why is this change necessary? (from ChatGTP) <- Xrhsto help explain this please 
 
@@ -275,7 +312,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
 
 # This concerns the formula inside train_utils.py during the training loop:
 
-# epoch_train_loss += loss.item() * scalograms.size(0) / len(train_loader.dataset)
+# epoch_train_loss += loss.item() * inputs.size(0) / len(train_loader.dataset)
 
 # Let’s break it down:
 # How Loss is Computed in PyTorch
@@ -284,7 +321,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
 #     loss = criterion(outputs, core_loss)
 #         This gives an average loss per batch.
 #     You accumulate the total epoch loss:
-#         You multiply the loss by scalograms.size(0), which is the batch size.
+#         You multiply the loss by inputs.size(0), which is the batch size.
 #         Then divide by the total dataset size len(train_loader.dataset).
 #         This ensures that the final epoch_train_loss is an average over all batches.
 
