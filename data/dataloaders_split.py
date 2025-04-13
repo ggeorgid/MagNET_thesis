@@ -172,7 +172,7 @@ def inspect_dataloader(dataloader, name="DataLoader", num_samples=5):
     scalograms, core_loss_values = batch  # Unpack batch
 
     # Print batch shape details
-    print(f"   - Scalogram Batch Shape: {scalograms.shape} (Expected: [batch_size, 1, 24, 24])")
+    print(f"   - Scalogram Batch Shape: {scalograms.shape} (Expected: [batch_size, 1, 24, 24]) or (Expected: [batch_size, 1, 224, 224])")
     print(f"   - Core Loss Batch Shape: {core_loss_values.shape} (Expected: [batch_size, 1])")
 
     # Print some sample values (first few in the batch)

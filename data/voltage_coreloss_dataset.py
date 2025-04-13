@@ -53,8 +53,8 @@ class VoltageCoreLossDataset(Dataset):
         Returns voltage time series and core loss value for a given index.
         - Voltage shape: [1, 8000] (single-channel time series for 1D convolution).
         - Core loss shape: scalar (batched as [batch_size] by dataloader).
-        """
-        voltage = torch.tensor(self.voltage_data[idx], dtype=torch.float32).unsqueeze(0)  # [1, 8000]
+        """        
+        voltage = torch.from_numpy(self.voltage_data[idx]).float().unsqueeze(0)  # [1, 8000]
         core_loss = torch.tensor(self.core_loss_values[idx], dtype=torch.float32)  # scalar
         return voltage, core_loss
 

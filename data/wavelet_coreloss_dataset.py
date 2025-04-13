@@ -52,14 +52,20 @@ class WaveletCoreLossDataset(Dataset):
         return len(self.scalograms)
 
     def __getitem__(self, idx):
-        scalogram = self.scalograms[idx]
+        scalogram = self.scalograms[idx]  # Shape: (1, 24, 24), NumPy array
         core_loss = self.core_loss_values[idx]
+        
+        # Squeeze the scalogram if it has an unnecessary channel dimension
+        if scalogram.ndim == 3 and scalogram.shape[0] == 1:
+            scalogram = scalogram.squeeze(0)  # From (1, 24, 24) to (24, 24)
+        
+        # Apply transform if provided, or convert to tensor
         if self.transform:
-            scalogram = self.transform(scalogram)
-        if isinstance(scalogram, torch.Tensor):
-            scalogram = scalogram.clone().detach().to(dtype=torch.float32)
+            scalogram = self.transform(scalogram)  # e.g., ToPILImage(), Resize(224, 224), ToTensor()
         else:
-            scalogram = torch.tensor(scalogram, dtype=torch.float32)
+            # Convert NumPy array to tensor efficiently and add channel dimension
+            scalogram = torch.from_numpy(scalogram).float().unsqueeze(0)  # (24, 24) -> (1, 24, 24)
+        
         core_loss = torch.tensor(core_loss, dtype=torch.float32)
         return scalogram, core_loss
 

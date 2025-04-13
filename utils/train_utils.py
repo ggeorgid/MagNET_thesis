@@ -12,12 +12,12 @@ import optuna
 FIGURE_DIR = "figures"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
-def plot_results(y_true, y_pred, relative_errors, are, title="Core Loss Prediction Results"):
-    """Plots and saves a figure with three subplots: Measured vs Predicted, Relative Error vs Measured, and Error Distribution."""
-    plt.figure(figsize=(15, 5))
+def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, title="Core Loss Prediction Results"):
+    """Plots and saves a figure with four subplots: Measured vs Predicted, Relative Error vs Measured, Absolute Error vs Measured, and Error Distribution."""
+    plt.figure(figsize=(20, 5))  # Increased width for four subplots
     
     # Subplot 1: Measured vs Predicted Core Loss
-    plt.subplot(1, 3, 1)
+    plt.subplot(1, 4, 1)  # Changed from (1, 3, 1) to (1, 4, 1)
     plt.scatter(y_true, y_pred, alpha=0.6, edgecolors='b', label='Predictions')
     min_val = min(min(y_true), min(y_pred))
     max_val = max(max(y_true), max(y_pred))
@@ -29,20 +29,28 @@ def plot_results(y_true, y_pred, relative_errors, are, title="Core Loss Predicti
     plt.grid(True)
     
     # Subplot 2: Relative Error vs Measured Core Loss
-    plt.subplot(1, 3, 2)
+    plt.subplot(1, 4, 2)  # Changed from (1, 3, 2) to (1, 4, 2)
     plt.scatter(y_true, relative_errors, alpha=0.6, edgecolors='b', label='Relative Errors')
-    #plt.axhline(y=are, color='black', linestyle='--', label=f'Avg. = {are:.2f}%')
     plt.axhline(y=np.mean(relative_errors), color='r', linestyle='--', label=f"Avg = {np.mean(relative_errors):.2f}%")
     plt.xlabel('Measured Core Loss [W]')
     plt.ylabel('Relative Error [%]')
     plt.title('Relative Error Distribution')
     plt.legend()
     plt.grid(True)
-    # Set y-axis limits to 0-50
     plt.ylim(0, 50)
     
-    # Subplot 3: Error Distribution (Histogram)
-    plt.subplot(1, 3, 3)
+    # Subplot 3: Absolute Error vs Measured Core Loss
+    plt.subplot(1, 4, 3)  # Remains (1, 4, 3)
+    plt.scatter(y_true, absolute_errors, alpha=0.6, edgecolors='b', label='Absolute Errors')
+    plt.axhline(y=mae, color='r', linestyle='--', label=f"MAE = {mae:.6f} W")
+    plt.xlabel('Measured Core Loss [W]')
+    plt.ylabel('Absolute Error [W]')
+    plt.title('Absolute Error Distribution')
+    plt.legend()
+    plt.grid(True)
+    
+    # Subplot 4: Error Distribution (Histogram)
+    plt.subplot(1, 4, 4)  # Remains (1, 4, 4)
     errors = y_pred - y_true
     plt.hist(errors, bins=20, edgecolor='black')
     plt.xlabel('Prediction Error [W]')
@@ -81,7 +89,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     
     # Define loss function and optimizer
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=config["LEARNING_RATE"])
+    optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=config["LEARNING_RATE"])#only pass the trainable parameters
     num_epochs = config["NUM_EPOCH"]
     
     # Training loop
@@ -166,6 +174,10 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         relative_errors = np.abs(y_test_pred - y_test_true) / (y_test_true + epsilon) * 100
         test_are = np.mean(relative_errors)
         
+        # Compute Absolute Errors (NEW)
+        absolute_errors_train = np.abs(y_train_pred - y_train_true)
+        absolute_errors_valid = np.abs(y_valid_pred - y_valid_true)
+        absolute_errors_test = np.abs(y_test_pred - y_test_true)
         
         # Log metrics to wandb
         wandb.log({
@@ -224,12 +236,14 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     np.save("y_test_pred.npy", y_test_pred)
     print("\n✅ Saved y_test_true.npy and y_test_pred.npy for sanity check.")
     
-    # Plot results
+    # Plot results (updated call)
     plot_results(
         y_test_true,
         y_test_pred,
         relative_errors,
         test_are,
+        absolute_errors_test,  # New argument
+        test_mae,              # New argument
         title="Core Loss Prediction Results on Test Set"
     )
     

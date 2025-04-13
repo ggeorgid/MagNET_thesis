@@ -1,5 +1,5 @@
 # -------------------- General Settings --------------------
-SEED: 22                  # Random seed for reproducibility
+SEED: 59                  # Random seed for reproducibility
 USE_GPU: True             # Enable GPU acceleration if available
 DOWNLOAD_DATASET: True    # Automatically download dataset if not present
 USE_CACHED_SCALOGRAMS: True # Use precomputed scalograms if available
@@ -9,6 +9,10 @@ USE_CACHED_CORE_LOSS: True # Use precomputed core loss for ablation model if ava
 NUM_EPOCH: 50             # Total number of training epochs
 BATCH_SIZE: 128           # Number of samples per batch
 LEARNING_RATE: 0.0005     # Learning rate for optimizer
+
+# -------------------- Transfer Learning Parameters --------------------
+USE_PRETRAINED: True # Use a pretrained weights for transfer learning model
+FREEZE_LAYERS: True  # Freeze layers of the pretrained model
 
 DATA_SUBSET_SIZE: null  # Null -> Full dataset (now only an optional debug parameter)
 
