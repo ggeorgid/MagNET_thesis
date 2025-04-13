@@ -46,7 +46,7 @@ python3 ablation_manual_sweep.py
 ```
 • Transfer Learning Model:
 ```bash
-    python3 transfer_manual_sweep.py
+python3 transfer_manual_sweep.py
 ```
 These scripts execute experiments with preset hyperparameter combinations and log the results for evaluation.
 
@@ -56,15 +56,15 @@ To run hyperparameter optimization using Optuna:
 
 • Scalogram Model:
 ```bash
-    python3 wavelet_main.py --optimize
+python3 wavelet_main.py --optimize
 ```
 • Ablation Model:
 ```bash
-    python3 ablation_main.py --optimize
+python3 ablation_main.py --optimize
 ```
 • Transfer Learning Model:
 ```bash
-    python3 transfer_main.py --optimize
+python3 transfer_main.py --optimize
 ```
 
 ---
