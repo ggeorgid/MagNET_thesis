@@ -229,38 +229,34 @@ def main():
 
     print(f"[INFO] Created WaveletCoreLossDataset with {len(wavelet_dataset)} samples.")
 
-    #----------------Inspecting Scalograms-CoreLoss Dataset----------------------------------------
-    #Print first 5 sample scalograms and core loss values
-    for i in range(5):
-        scalogram, core_loss = wavelet_dataset[i]  # Get dataset sample
+    #----------------Inspecting Scalograms-CoreLoss Dataset----------------------------------------    
+    # Collect the first 5 samples and all core loss values in one go
+    samples = [wavelet_dataset[i] for i in range(5)]
+    core_loss_values = torch.tensor([wavelet_dataset[i][1].item() for i in range(len(wavelet_dataset))])
 
+    # Inspect the first 5 samples
+    for i, (scalogram, core_loss) in enumerate(samples):
         print(f"\n🔹 [DEBUG] Sample {i}:")
         print(f"   - Scalogram Shape: {scalogram.shape} (Expected: [1, 24, 24])")
         print(f"   - Core Loss Value: {core_loss.item()}")
+        scalogram_block = scalogram.squeeze(0)[:3, :3]  # Squeeze channel dim, take 3x3 block
+        print(f"   - Scalogram Sample Values (first 3×3 block):\n{scalogram_block}")
 
-        # Print a small section of the scalogram (first 3×3 block)
-        print(f"   - Scalogram Sample Values (first 3×3 block):\n{scalogram.squeeze().numpy()[:3, :3]}")
-        
-    #Compute statistics
-    core_loss_values = np.array([wavelet_dataset[i][1].item() for i in range(len(wavelet_dataset))])
-
+    # Compute core loss statistics
     print("\n🔹 [DEBUG] Core Loss Dataset Statistics:")
-    print(f"   - Mean: {np.mean(core_loss_values)}")
-    print(f"   - Min: {np.min(core_loss_values)}")
-    print(f"   - Max: {np.max(core_loss_values)}")
-    print(f"   - Std Dev: {np.std(core_loss_values)}")
-    
-    # Extract 5 random samples and check their scalogram shapes
-    random_indices = np.random.choice(len(wavelet_dataset), 5, replace=False)
+    print(f"   - Mean: {core_loss_values.mean().item()}")
+    print(f"   - Min: {core_loss_values.min().item()}")
+    print(f"   - Max: {core_loss_values.max().item()}")
+    print(f"   - Std Dev: {core_loss_values.std().item()}")
 
-    for idx in random_indices:
-        scalogram, core_loss = wavelet_dataset[idx]
-        
+    # Extract and inspect 5 random samples
+    random_indices = np.random.choice(len(wavelet_dataset), 5, replace=False)
+    random_samples = [wavelet_dataset[idx] for idx in random_indices]
+
+    for idx, (scalogram, core_loss) in zip(random_indices, random_samples):
         print(f"\n🔹 [DEBUG] Random Sample {idx}:")
         print(f"   - Scalogram Shape: {scalogram.shape}")
         print(f"   - Core Loss Value: {core_loss.item()}")
-
-        # Check mean and variance of the scalogram
         print(f"   - Scalogram Mean: {scalogram.mean().item()}, Variance: {scalogram.var().item()}")
         
             
