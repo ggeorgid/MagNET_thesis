@@ -69,6 +69,9 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     """
     use_wandb_sweep = wandb.run is not None  # Detect if inside a wandb sweep
     
+    # Added print statement to track USE_PRETRAINED at the start
+    print(f"🔹 [DEBUG] USE_PRETRAINED at start of train_model: {config.get('USE_PRETRAINED', 'Not found')}")
+
     #--------Optuna Pruning Step--------
     #wandb.watch(model, log="all", log_freq=10)  # Log model gradients and parameters
     best_val_loss = float("inf")
@@ -87,12 +90,35 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     core_loss_values = np.concatenate(core_loss_values, axis=0)  # Flatten
     print(f"🔹 Before training - Core loss mean: {core_loss_values.mean():.6f}, variance: {core_loss_values.var():.6f}")
     
-    # Define loss function and optimizer
+    # 🔹 Step 2: Define loss function and optimizer
+    # Define loss function
     criterion = nn.MSELoss()
-    optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=config["LEARNING_RATE"])#only pass the trainable parameters
+
+    # Added print statement to track USE_PRETRAINED before optimizer setup
+    print(f"🔹 [DEBUG] USE_PRETRAINED before optimizer setup: {config.get('USE_PRETRAINED', 'Not found')}")
+    optimizer = torch.optim.Adam(
+        [p for p in model.parameters() if p.requires_grad],
+        lr=config["LEARNING_RATE"]
+    )
+    # # Set up optimizer with conditional logic
+    # if config.get("USE_PRETRAINED", False):  # Check if USE_PRETRAINED is True
+    #     # For transfer learning model, use differential learning rates
+    #     layer4_params = [param for name, param in model.named_parameters() if name.startswith("layer4.") and param.requires_grad]
+    #     fc_params = [param for name, param in model.named_parameters() if name.startswith("fc.") and param.requires_grad]
+    #     optimizer = optim.Adam([
+    #         {'params': layer4_params, 'lr': config["LEARNING_RATE"] },  # Smaller LR for layer4
+    #         {'params': fc_params, 'lr': config["LEARNING_RATE"] }            # Full LR for fc
+    #     ])
+    #     # Added print statement to confirm differential learning rates
+    #     print("🔹 [DEBUG] Using differential learning rates for transfer learning")
+    # else:
+    #     # For other models (wavelet, ablation), use standard optimizer
+    #     optimizer = optim.Adam([p for p in model.parameters() if p.requires_grad], lr=config["LEARNING_RATE"])
+    #     # Added print statement to confirm standard optimizer
+    #     print("🔹 [DEBUG] Using standard optimizer for other models")
     num_epochs = config["NUM_EPOCH"]
     
-    # Training loop
+    # 🔹 Step 3: Training loop
     for epoch in range(1, num_epochs + 1):
         # Training Phase
         model.train()

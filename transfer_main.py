@@ -30,8 +30,8 @@ def parse_args():
     parser.add_argument("--learning_rate", type=float, help="Learning rate")
     parser.add_argument("--batch_size", type=int, help="Batch size")
     parser.add_argument("--optimize", action="store_true", help="Run Optuna optimization")
-    parser.add_argument("--use_pretrained", action="store_true", help="Use pre-trained weights")
-    parser.add_argument("--freeze_layers", action="store_true", help="Freeze layers except conv1 and fc")
+    #parser.add_argument("--use_pretrained", action="store_true", help="Use pre-trained weights")
+    parser.add_argument("--freeze_layers", action="store_true", help="Freeze layers except fc")
     return parser.parse_args()
 
 def get_current_date_str():
@@ -61,9 +61,13 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
         config=config
     )
 
+    # Print USE_PRETRAINED before model initialization
+    print(f"🔹 [DEBUG] USE_PRETRAINED before model initialization in objective: {config['USE_PRETRAINED']}")
+
     model = TransferModel(
         use_pretrained=config["USE_PRETRAINED"],
-        freeze_layers=config["FREEZE_LAYERS"]
+        #freeze_layers=config["FREEZE_LAYERS"]
+        fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
     ).to(device)
     
     # Debugging code to verify layer freezing
@@ -99,9 +103,13 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
         config=config
     )
 
+    # Print USE_PRETRAINED before model initialization
+    print(f"🔹 [DEBUG] USE_PRETRAINED before model initialization in run_training: {config['USE_PRETRAINED']}")
+
     model = TransferModel(
         use_pretrained=config["USE_PRETRAINED"],
-        freeze_layers=config["FREEZE_LAYERS"]
+        #freeze_layers=config["FREEZE_LAYERS"]
+        fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
     ).to(device)
     
     # Debugging code to verify layer freezing
@@ -132,6 +140,9 @@ def main():
     with open("hyperparameters.yaml", "r") as file:
         config = yaml.safe_load(file)
 
+    # Print initial USE_PRETRAINED from YAML
+    print(f"🔹 [DEBUG] Initial USE_PRETRAINED from YAML: {config['USE_PRETRAINED']}")
+
     args = parse_args()
 
     # Override YAML hyperparameters with command-line arguments
@@ -139,9 +150,13 @@ def main():
     config["DATA_SUBSET_SIZE"] = args.data_subset_size if args.data_subset_size is not None else config.get("DATA_SUBSET_SIZE", None)
     config["LEARNING_RATE"] = args.learning_rate if args.learning_rate is not None else config["LEARNING_RATE"]
     config["BATCH_SIZE"] = args.batch_size if args.batch_size is not None else config["BATCH_SIZE"]
-    config["USE_PRETRAINED"] = args.use_pretrained if args.use_pretrained else config.get("USE_PRETRAINED", True)
+    #config["USE_PRETRAINED"] = args.use_pretrained if args.use_pretrained else config.get("USE_PRETRAINED", True)
     config["FREEZE_LAYERS"] = args.freeze_layers if args.freeze_layers else config.get("FREEZE_LAYERS", False)
-    
+    config["USE_PRETRAINED"] = True  # Force True for transfer learning
+    print("🔹 [INFO] Forcing USE_PRETRAINED=True for transfer_main.py")
+    # Print USE_PRETRAINED after forcing
+    print(f"🔹 [DEBUG] USE_PRETRAINED after forcing: {config['USE_PRETRAINED']}")
+
     # Set all necessary random seeds
     torch.manual_seed(config["SEED"])
     torch.cuda.manual_seed_all(config["SEED"])

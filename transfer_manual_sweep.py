@@ -10,7 +10,7 @@ python_cmd = "python3" if sys.platform != "win32" else "python"
 # Define hyperparameter values for the sweep
 num_epochs = [50]
 learning_rates = [0.001, 0.0005]
-batch_sizes = [32, 64, 128, 256]
+batch_sizes = [32, 64, 128] # Removed 256 because GPU could not handle it (error 9)
 
 # Generate a timestamp for the log file
 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
