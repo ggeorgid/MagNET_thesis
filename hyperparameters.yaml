@@ -13,7 +13,7 @@ LEARNING_RATE: 0.0005     # Learning rate for optimizer
 # -------------------- Transfer Learning Parameters --------------------
 USE_PRETRAINED: False # Use a pretrained weights for transfer learning model
 FREEZE_LAYERS: True  # Freeze layers of the pretrained model
-FINE_TUNE_LAYERS: ["layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning
+FINE_TUNE_LAYERS: ["layer3" , "layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning
 
 DATA_SUBSET_SIZE: null  # Null -> Full dataset (now only an optional debug parameter)
 

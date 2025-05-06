@@ -106,8 +106,8 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     #     layer4_params = [param for name, param in model.named_parameters() if name.startswith("layer4.") and param.requires_grad]
     #     fc_params = [param for name, param in model.named_parameters() if name.startswith("fc.") and param.requires_grad]
     #     optimizer = optim.Adam([
-    #         {'params': layer4_params, 'lr': config["LEARNING_RATE"] },  # Smaller LR for layer4
-    #         {'params': fc_params, 'lr': config["LEARNING_RATE"] }            # Full LR for fc
+    #         {'params': layer4_params, 'lr': config["LEARNING_RATE"] /0.5},  # Smaller LR for layer4
+    #         {'params': fc_params, 'lr': config["LEARNING_RATE"] *0.5 }            # Full LR for fc
     #     ])
     #     # Added print statement to confirm differential learning rates
     #     print("🔹 [DEBUG] Using differential learning rates for transfer learning")
