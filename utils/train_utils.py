@@ -63,7 +63,7 @@ def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, tit
     plt.close()
 
 
-def train_model(model, train_loader, valid_loader, test_loader, config, device, trial=None):
+def train_model(model, train_loader, valid_loader, test_loader, config, device, save_path='best_model.pth', trial=None):
     """
     Trains the model and logs metrics to wandb.
     """
@@ -72,17 +72,20 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     # Added print statement to track USE_PRETRAINED at the start
     print(f"🔹 [DEBUG] USE_PRETRAINED at start of train_model: {config.get('USE_PRETRAINED', 'Not found')}")
 
+    # 🔹 Step 0: Initialize variables to track and graph the model with the best validation loss
+    # Initialize best validation loss 
+    best_val_loss = float('inf')    
+
     #--------Optuna Pruning Step--------
-    #wandb.watch(model, log="all", log_freq=10)  # Log model gradients and parameters
-    best_val_loss = float("inf")
-    early_stopping_patience = 5
+    #wandb.watch(model, log="all", log_freq=10)  # Log model gradients and parameters    
+    early_stopping_patience = 10
     patience_counter = 0
     #-------------------------------------
            
     print("\n✅ Training with the following hyperparameters:")
     print(config)
     
-    # 🔹 Step 1: Check if core_loss has variation BEFORE training
+    # 🔹 Step 1: Check if core_loss has variation BEFORE training <- Optional Step. Can be commented out 
     core_loss_values = []
     for _, core_loss in train_loader:
         core_loss_values.append(core_loss.numpy())  # Convert tensor to NumPy array
@@ -153,6 +156,19 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
                 y_valid_true.append(core_loss.cpu())
                 y_valid_pred.append(outputs.cpu())
         
+        # Check for best model
+        if epoch_valid_loss < best_val_loss:
+            best_val_loss = epoch_valid_loss
+            try:
+                torch.save(model.state_dict(), save_path)
+                print(f"✅ Epoch {epoch}: New best model saved with val_loss: {best_val_loss:.6f}")
+            except IOError as e:
+                print(f"❌ Error saving model: {e}")            
+            patience_counter = 0
+        else:
+            patience_counter += 1
+
+        
         # Test Phase
         epoch_test_loss = 0
         y_test_true, y_test_pred = [], []
@@ -167,7 +183,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
                 y_test_true.append(core_loss.cpu())
                 y_test_pred.append(outputs.cpu())
         
-        # Compute Metrics for Train, Validation, and Test Sets
+        # Compute Metrics for Train, Validation, and Test Sets for all epochs(models)
         y_train_true = torch.cat(y_train_true).numpy().flatten()
         y_train_pred = torch.cat(y_train_pred).numpy().flatten()
         y_valid_true = torch.cat(y_valid_true).numpy().flatten()
@@ -175,15 +191,17 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         y_test_true = torch.cat(y_test_true).numpy().flatten()
         y_test_pred = torch.cat(y_test_pred).numpy().flatten()
 
-        # Compute R² using sklearn
+        # Compute R² using sklearn for all epochs(models)
         train_r2 = r2_score(y_train_true, y_train_pred)
         valid_r2 = r2_score(y_valid_true, y_valid_pred)
         test_r2 = r2_score(y_test_true, y_test_pred)
 
+        # Compute MAE for all epochs(models)
         train_mae = mean_absolute_error(y_train_true, y_train_pred)
         valid_mae = mean_absolute_error(y_valid_true, y_valid_pred)
         test_mae = mean_absolute_error(y_test_true, y_test_pred)
 
+        # Compute MSE for all epochs(models)
         train_mse = mean_squared_error(y_train_true, y_train_pred)
         valid_mse = mean_squared_error(y_valid_true, y_valid_pred)
         test_mse = mean_squared_error(y_test_true, y_test_pred)
@@ -206,32 +224,34 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         absolute_errors_test = np.abs(y_test_pred - y_test_true)
         
         # Log metrics to wandb
-        wandb.log({
-            "_step": epoch,
-            "epoch": epoch,
-            "Loss/Train": epoch_train_loss,
-            "Loss/Validation": epoch_valid_loss,
-            "Loss/Test": epoch_test_loss,
-            "MSE/Train": train_mse,
-            "MSE/Validation": valid_mse,
-            "MSE/Test": test_mse,
-            "MAE/Train": train_mae,
-            "MAE/Validation": valid_mae,
-            "MAE/Test": test_mae,
-            "R2/Train": train_r2,
-            "R2/Validation": valid_r2,
-            "R2/Test": test_r2,
-            "ARE/Train": train_are,
-            "ARE/Validation": valid_are,
-            "ARE/Test": test_are,
-        })
+        if wandb.run is not None:
+            wandb.log({
+                "_step": epoch,
+                "epoch": epoch,
+                "Loss/Train": epoch_train_loss,
+                "Loss/Validation": epoch_valid_loss,
+                "Loss/Test": epoch_test_loss,
+                "MSE/Train": train_mse,
+                "MSE/Validation": valid_mse,
+                "MSE/Test": test_mse,
+                "MAE/Train": train_mae,
+                "MAE/Validation": valid_mae,
+                "MAE/Test": test_mae,
+                "R2/Train": train_r2,
+                "R2/Validation": valid_r2,
+                "R2/Test": test_r2,
+                "ARE/Train": train_are,
+                "ARE/Validation": valid_are,
+                "ARE/Test": test_are                
+            })
         
         print(f"Epoch {epoch:02d} | Train Loss: {epoch_train_loss:.6f} | Validation Loss: {epoch_valid_loss:.6f} | "
                f"Test Loss: {epoch_test_loss:.6f} | Train R²: {train_r2:.4f} | Validation R²: {valid_r2:.4f} | "
                f"Test R²: {test_r2:.4f} | Train MAE: {train_mae:.6f} | Validation MAE: {valid_mae:.6f} | "
                f"Test MAE: {test_mae:.6f} | Train MSE: {train_mse:.6f} | Validation MSE: {valid_mse:.6f} | "
                f"Test MSE: {test_mse:.6f} | Train ARE: {train_are:.2f}% | Validation ARE: {valid_are:.2f}% | "
-               f"Test ARE: {test_are:.2f}%")                
+               f"Test ARE: {test_are:.2f}% ")                
+
 
         # Report to Optuna for pruning (only if trial is provided)
         if trial:
@@ -239,46 +259,59 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
             if trial.should_prune():
                 raise optuna.TrialPruned()
 
-        # Early stopping logic (only if trial is provided)
-        if trial:
-            if epoch_valid_loss < best_val_loss:
-                best_val_loss = epoch_valid_loss
-                patience_counter = 0
-            else:
-                patience_counter += 1
-            if patience_counter >= early_stopping_patience:
-                print(f"[INFO] Early stopping triggered at epoch {epoch}.")
-                break
-        
-    torch.save(model.state_dict(), "trained_model.pth")
+        # Early stopping logic 
+        if patience_counter >= early_stopping_patience:
+            print(f"[INFO] Early stopping triggered at epoch {epoch}.")
+            break
+
+    print(f"Model saved to: {os.path.abspath(save_path)}")
+    # 🔹 Step 4: Load the best model to prepare for graphs  
+    # Load the best model state
+    model.load_state_dict(torch.load(save_path))
+    print("✅ Best model loaded for evaluation and plotting.")
     
-    # Log final validation loss correctly when NOT using Optuna
-    print(f"Final Validation Loss: {epoch_valid_loss}")
-    if trial is None:
-        final_epoch_loss = epoch_valid_loss
+    # Evaluate on test set with the best model
+    model.eval()
+    y_test_true, y_test_pred_best = [], []
+    with torch.inference_mode():
+        for inputs, core_loss in test_loader:
+            inputs, core_loss = inputs.to(device), core_loss.to(device)
+            outputs = model(inputs)
+            y_test_true.append(core_loss.cpu())
+            y_test_pred_best.append(outputs.cpu())
+    y_test_true = torch.cat(y_test_true).numpy().flatten()
+    y_test_pred_best = torch.cat(y_test_pred_best).numpy().flatten()
+
+    # # Log final validation loss correctly when NOT using Optuna
+    # print(f"Final Validation Loss: {epoch_valid_loss}")
+    # if trial is None:
+    #     final_epoch_loss = epoch_valid_loss
+
+    # Compute metrics for plotting
+    epsilon = 0.001
+    relative_errors_best = np.abs(y_test_pred_best - y_test_true) / (y_test_true + epsilon) * 100
+    are_best = np.mean(relative_errors_best)
+    absolute_errors_best = np.abs(y_test_pred_best - y_test_true) #an array of absolute errors used for the graph
+    mae_best = mean_absolute_error(y_test_true, y_test_pred_best) #the mean absolute error metric value
         
     # Save test set true and predicted values for sanity check
     np.save("y_test_true.npy", y_test_true)
     np.save("y_test_pred.npy", y_test_pred)
     print("\n✅ Saved y_test_true.npy and y_test_pred.npy for sanity check.")
     
-    # Plot results (updated call)
+    # Plot results for the best performing epoch-model <-Updated needs checking
     plot_results(
         y_test_true,
-        y_test_pred,
-        relative_errors,
-        test_are,
-        absolute_errors_test,  # New argument
-        test_mae,              # New argument
+        y_test_pred_best,
+        relative_errors_best,
+        are_best,
+        absolute_errors_best,  # New argument
+        mae_best,              # New argument
         title="Core Loss Prediction Results on Test Set"
     )
     
-    # Return model and best validation loss    
-    if trial:
-        return model, best_val_loss
-    else:
-        return model, final_epoch_loss
-
+    # Return the best model and best validation loss
+    return model, best_val_loss
 
 
 

@@ -51,7 +51,13 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
     # Set project name with readable date
     date_str = get_current_date_str()  # e.g., "March17"
     project_name = f"OptunaOptimization_{date_str}"  # e.g., "OptunaOptimization_March17"
-    
+
+    # Define the project root as the directory where wavelet_main.py resides
+    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+    # Specify a unique save path for this model
+    save_path = os.path.join(PROJECT_ROOT, 'wavelet_best_model.pth')
+
     # Initialize wandb run
     wandb.init(
         project=project_name,
@@ -67,6 +73,7 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
         test_loader=test_loader,
         config=config,
         device=device,
+        save_path=save_path,
         trial=trial  # Pass trial for pruning
     )
 
@@ -81,6 +88,12 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
     date_str = get_current_date_str()  # e.g., "March17"
     project_name = f"ManualSweep_{date_str}"  # e.g., "ManualSweep_March17"
     
+    # Define the project root as the directory where wavelet_main.py resides
+    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+    # Specify a unique save path for this model
+    save_path = os.path.join(PROJECT_ROOT, 'wavelet_best_model.pth')
+
     # Initialize wandb run
     wandb.init(
         project=project_name,
@@ -95,7 +108,8 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
         valid_loader=valid_loader,
         test_loader=test_loader,
         config=config,
-        device=device
+        device=device,
+        save_path=save_path
     )
 
     # Log final validation loss
@@ -328,7 +342,6 @@ def main():
     # check_reproducibility(test_loader, "Test DataLoader", seed=config["SEED"])
     
         
-    
     #-------------------------------Deciding to train the model or run Optuna optimization---------------------
     if args.optimize:
         # Run Optuna optimization

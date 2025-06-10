@@ -54,6 +54,12 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
     date_str = get_current_date_str()
     project_name = f"TransferLearning_OptunaOptimization_{date_str}"
     
+    # Define the project root as the directory where wavelet_main.py resides
+    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+    # Specify a unique save path for this model
+    save_path = os.path.join(PROJECT_ROOT, 'transfer_best_model.pth')
+
     # Initialize wandb run
     wandb.init(
         project=project_name,
@@ -82,6 +88,7 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
         test_loader=test_loader,
         config=config,
         device=device,
+        save_path=save_path,
         trial=trial
     )
 
@@ -96,6 +103,12 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
     date_str = get_current_date_str()
     project_name = f"TransferLearning_ManualSweep_{date_str}"
     
+    # Define the project root as the directory where wavelet_main.py resides
+    PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+    # Specify a unique save path for this model
+    save_path = os.path.join(PROJECT_ROOT, 'transfer_best_model.pth')
+
     # Initialize wandb run
     wandb.init(
         project=project_name,
@@ -123,7 +136,8 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
         valid_loader=valid_loader,
         test_loader=test_loader,
         config=config,
-        device=device
+        device=device,
+        save_path=save_path
     )
 
     # Log final validation loss
