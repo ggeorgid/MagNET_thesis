@@ -15,7 +15,7 @@ USE_PRETRAINED: False # Use a pretrained weights for transfer learning model <- 
 FREEZE_LAYERS: True  # Freeze layers of the pretrained model
 FINE_TUNE_LAYERS: ["layer3" , "layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning
 
-DATA_SUBSET_SIZE: null  # Null -> Full dataset (now only an optional debug parameter)
+DATA_SUBSET_SIZE: null  # null -> Full dataset (now only an optional debug parameter)
 
 # ⚠️ Note: DATA_SUBSET_SIZE is only for debugging.  
 # ⚠️ If using USE_CACHED_SCALOGRAMS = False, scalograms will be **recomputed**.  

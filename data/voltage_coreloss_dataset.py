@@ -54,7 +54,7 @@ class VoltageCoreLossDataset(Dataset):
         - Voltage shape: [1, 8000] (single-channel time series for 1D convolution).
         - Core loss shape: scalar (batched as [batch_size] by dataloader).
         """        
-        voltage = torch.from_numpy(self.voltage_data[idx]).float().unsqueeze(0)  # [1, 8000]
+        voltage = torch.from_numpy(self.voltage_data[idx].copy()).float().unsqueeze(0)  # [1, 8000] added copy() to avoid warning
         core_loss = torch.tensor(self.core_loss_values[idx], dtype=torch.float32)  # scalar
         return voltage, core_loss
 

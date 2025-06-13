@@ -267,7 +267,7 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     print(f"Model saved to: {os.path.abspath(save_path)}")
     # 🔹 Step 4: Load the best model to prepare for graphs  
     # Load the best model state
-    model.load_state_dict(torch.load(save_path))
+    model.load_state_dict(torch.load(save_path, weights_only=True)) # weights_only=True parameter to avoid warning about malicious intent
     print("✅ Best model loaded for evaluation and plotting.")
     
     # Evaluate on test set with the best model

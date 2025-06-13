@@ -76,6 +76,13 @@ def objective(trial, config, device, train_loader, valid_loader, test_loader):
         fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
     ).to(device)
     
+    # # Model Summary (optional)
+    # model = TransferModel(
+    #     use_pretrained=config["USE_PRETRAINED"],
+    #     fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
+    # ).to(device)
+    # summary(model, input_size=(1, 3, 224, 224))  # Add this line
+
     # Debugging code to verify layer freezing
     print("\n🔹 Checking layer statuses (trainable or frozen):")
     for name, param in model.named_parameters():
@@ -125,6 +132,13 @@ def run_training(config, device, train_loader, valid_loader, test_loader):
         fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
     ).to(device)
     
+    # # Model Summary (optional)
+    # model = TransferModel(
+    #     use_pretrained=config["USE_PRETRAINED"],
+    #     fine_tune_layers=config.get("FINE_TUNE_LAYERS", ["fc"])
+    # ).to(device)
+    # summary(model, input_size=(1, 3, 224, 224))  # Add this line
+
     # Debugging code to verify layer freezing
     print("\n🔹 Checking layer statuses (trainable or frozen):")
     for name, param in model.named_parameters():
@@ -268,9 +282,10 @@ def main():
     dataset_subset = dataset[indices]         
     tensor_dataset = convert_to_tensors(dataset_subset)
     
-    # ---------------------- Caching and Scalogram Processing ----------------------
+    # ---------------------- Caching and Scalogram Processing ----------------------    
     scalograms_path = preprocessed_data_path / "scalograms_224.npy"
     core_loss_path = preprocessed_data_path / "core_loss.npy"
+    scalograms_memmap_path = preprocessed_data_path / "scalograms_memmap.dat" #unused, but kept for reference
 
     if config.get("USE_CACHED_SCALOGRAMS", False) and scalograms_path.exists() and core_loss_path.exists():
         print("[INFO] Loading cached scalograms and core loss.")
@@ -289,7 +304,7 @@ def main():
 
         # Save new scalograms if caching is enabled
         if config.get("USE_CACHED_SCALOGRAMS", False):
-            np.save(scalograms_path, wavelet_dataset.scalograms)  # Still saves 24x24
+            np.save(scalograms_path, wavelet_dataset.scalograms)  # Can also be wavelet_dataset.scalograms[:]
             np.save(core_loss_path, wavelet_dataset.core_loss_values)
             print("[INFO] Cached new scalograms to scalograms_224.npy.")
 
