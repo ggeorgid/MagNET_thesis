@@ -11,8 +11,8 @@ BATCH_SIZE: 128           # Number of samples per batch
 LEARNING_RATE: 0.0005     # Learning rate for optimizer
 
 # -------------------- Transfer Learning Parameters --------------------
-USE_PRETRAINED: False # Use a pretrained weights for transfer learning model <- Might have misleading name
-FREEZE_LAYERS: True  # Freeze layers of the pretrained model
+USE_PRETRAINED: True # Use a pretrained weights for transfer learning model <- Might have misleading name
+#FREEZE_LAYERS: True  # Freeze layers of the pretrained model
 FINE_TUNE_LAYERS: ["layer3" , "layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning
 
 DATA_SUBSET_SIZE: null  # null -> Full dataset (now only an optional debug parameter)

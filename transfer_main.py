@@ -179,11 +179,11 @@ def main():
     config["LEARNING_RATE"] = args.learning_rate if args.learning_rate is not None else config["LEARNING_RATE"]
     config["BATCH_SIZE"] = args.batch_size if args.batch_size is not None else config["BATCH_SIZE"]
     #config["USE_PRETRAINED"] = args.use_pretrained if args.use_pretrained else config.get("USE_PRETRAINED", True)
-    config["FREEZE_LAYERS"] = args.freeze_layers if args.freeze_layers else config.get("FREEZE_LAYERS", False)
-    config["USE_PRETRAINED"] = True  # Force True for transfer learning
-    print("🔹 [INFO] Forcing USE_PRETRAINED=True for transfer_main.py")
+    #config["FREEZE_LAYERS"] = args.freeze_layers if args.freeze_layers else config.get("FREEZE_LAYERS", False)
+    #config["USE_PRETRAINED"] = True  # Force True for transfer learning
+    #print("🔹 [INFO] Forcing USE_PRETRAINED=True for transfer_main.py")
     # Print USE_PRETRAINED after forcing
-    print(f"🔹 [DEBUG] USE_PRETRAINED after forcing: {config['USE_PRETRAINED']}")
+    #print(f"🔹 [DEBUG] USE_PRETRAINED after forcing: {config['USE_PRETRAINED']}")
 
     # Set all necessary random seeds
     torch.manual_seed(config["SEED"])

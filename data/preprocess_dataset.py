@@ -6,6 +6,8 @@ import numpy as np
 from skimage.transform import resize
 from tqdm import tqdm
 from pathlib import Path
+import matplotlib.pyplot as plt
+import os
 
 def check_dataset_exists(dataset_path, check_for_npy=True):
     """
@@ -283,7 +285,7 @@ def calculate_scalograms(
         scalograms[index] = resize(abs(cwtmatr), (image_size, image_size), anti_aliasing=True) #υπαρχει ενα [index,0]
 
         if index == 0:
-            print(f"[DEBUG] First Scalogram Shape: {cwtmatr.shape} | Resized to: {scalograms[index].shape}")
+            print(f"[DEBUG] First Scalogram Shape: {cwtmatr.shape} | Resized to: {scalograms[index].shape}")            
 
     # Ensure data is written to disk
     scalograms.flush()
