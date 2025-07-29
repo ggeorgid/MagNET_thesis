@@ -15,9 +15,9 @@ def extract_drive_file_id(url):
 
 def dataset_already_downloaded(output_file, save_dir):
     """Checks if the dataset archive or extracted files already exist."""
-    if not Path(output_file).exists():  # ✅ First check if file exists
+    if not Path(output_file).exists():  
         return False
-    if tarfile.is_tarfile(output_file):  # Now safe to check if it's a tar file
+    if tarfile.is_tarfile(output_file):  
         with tarfile.open(output_file, "r:gz") as tar:
             return all(Path(save_dir, member.name).exists() for member in tar.getmembers())
     return Path(output_file).exists()
@@ -57,7 +57,7 @@ def download_dataset(url: str, save_dir: str, filename: str = None):
                 print("[INFO] Dataset successfully extracted.")
         except tarfile.TarError as e:
             print(f"[ERROR] Failed to extract dataset: {e}")
-            return  # Stop further processing if extraction fails
+            return  
 
         # Cleanup: Delete the archive file
         try:

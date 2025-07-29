@@ -5,7 +5,7 @@ from data.preprocess_dataset import calculate_core_loss, calculate_scalograms
 
 class WaveletCoreLossDataset(Dataset):
     def __init__(self, V_I_dataset=None, sample_rate=2e-6, sample_length=None, transform=None,
-                 wave_name='morl', total_scale=40, fmax=10e3, image_size=24, #wave_name='cgau8',
+                 wave_name='morl', total_scale=41, fmax=10e3, image_size=24, #wave_name='cgau8',
                  scalograms_path=None, core_loss_path=None, verbose=True):
         """
         Initializes the dataset class.
@@ -83,81 +83,6 @@ class WaveletCoreLossDataset(Dataset):
 
     def get_raw_scalogram(self, idx):
         return self.scalograms[idx].squeeze().reshape(24, 24)
-
-# import torch
-# import numpy as np
-# from torch.utils.data import Dataset
-# from data.preprocess_dataset import calculate_core_loss, calculate_scalograms
-
-# class WaveletCoreLossDataset(Dataset):
-#     def __init__(self, V_I_dataset=None, sample_rate=2e-6, sample_length=None, transform=None, #wave_name='cgau8', 
-#                  scalograms_path=None, core_loss_path=None, verbose=True):
-#         """
-#         Initializes the dataset class.
-#         - Loads precomputed scalograms and core loss if paths are provided.
-#         - Otherwise, computes core loss and scalograms from `V_I_dataset`.
-#         """
-#         self.transform = transform
-#         self.verbose = verbose
-#         self.sample_rate = sample_rate
-#         self.sample_length = sample_length
-
-#         if scalograms_path and core_loss_path:
-#             if self.verbose:
-#                 print("[INFO] Loading precomputed scalograms and core loss.")
-#             self.scalograms = np.load(scalograms_path, mmap_mode='r')
-#             self.core_loss_values = np.load(core_loss_path, mmap_mode='r')
-#             # Clamp loaded core loss values to non-negative
-#             self.core_loss_values = np.maximum(self.core_loss_values, 0)
-#         elif V_I_dataset is not None:
-#             voltage_data = V_I_dataset.tensors[0]  # Keep as tensor
-            
-#             if self.verbose:
-#                 print(f"[INFO] Computing core loss & scalograms from raw dataset. Sample Length: {sample_length or voltage_data.shape[1]}, Sample Rate: {sample_rate}")
-            
-#             # Compute core loss
-#             core_loss_tensor = calculate_core_loss(V_I_dataset=V_I_dataset).tensors[1]
-#             self.core_loss_values = core_loss_tensor.numpy()
-#             # Clamp computed core loss values to non-negative
-#             self.core_loss_values = np.maximum(self.core_loss_values, 0)
-            
-#             # Compute scalograms
-#             self.scalograms = calculate_scalograms(
-#                 dataset=np.stack((voltage_data.numpy(), np.zeros_like(voltage_data.numpy())), axis=2),
-#                 sampling_period=sample_rate,
-#                 #wave_name=wave_name,
-#                 sample_length=sample_length
-#             )
-#         else:
-#             raise ValueError("Provide either (V_I_dataset) or (scalograms_path and core_loss_path).")
-        
-#         if self.verbose:
-#             print(f"[DEBUG] Core Loss Stats - Mean: {np.mean(self.core_loss_values)}, Min: {np.min(self.core_loss_values)}, Max: {np.max(self.core_loss_values)}")
-    
-#     def __len__(self):
-#         return len(self.scalograms)
-
-#     def __getitem__(self, idx):
-#         scalogram = self.scalograms[idx]  # Shape: (1, 24, 24), NumPy array
-#         core_loss = self.core_loss_values[idx]
-        
-#         # Squeeze the scalogram if it has an unnecessary channel dimension
-#         if scalogram.ndim == 3 and scalogram.shape[0] == 1:
-#             scalogram = scalogram.squeeze(0)  # From (1, 24, 24) to (24, 24)
-        
-#         # Apply transform if provided, or convert to tensor
-#         if self.transform:
-#             scalogram = self.transform(scalogram)  # e.g., ToPILImage(), Resize(224, 224), ToTensor()
-#         else:
-#             # Convert NumPy array to tensor efficiently and add channel dimension
-#             scalogram = scalogram.float().unsqueeze(0)  # (24, 24) -> (1, 24, 24)
-#             #scalogram = torch.from_numpy(scalogram).float().unsqueeze(0)  # (24, 24) -> (1, 24, 24)
-        
-#         core_loss = torch.tensor(core_loss, dtype=torch.float32)
-#         return scalogram, core_loss
-
-#     def get_raw_scalogram(self, idx):
-#         return self.scalograms[idx].squeeze().reshape(24, 24)
 
 
 

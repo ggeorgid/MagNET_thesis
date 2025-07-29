@@ -14,10 +14,10 @@ os.makedirs(FIGURE_DIR, exist_ok=True)
 
 def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, title="Core Loss Prediction Results"):
     """Plots and saves a figure with four subplots: Measured vs Predicted, Relative Error vs Measured, Absolute Error vs Measured, and Error Distribution."""
-    plt.figure(figsize=(20, 5))  # Increased width for four subplots
+    plt.figure(figsize=(20, 5))  
     
     # Subplot 1: Measured vs Predicted Core Loss
-    plt.subplot(1, 4, 1)  # Changed from (1, 3, 1) to (1, 4, 1)
+    plt.subplot(1, 4, 1)  
     plt.scatter(y_true, y_pred, alpha=0.6, edgecolors='b', label='Predictions')
     min_val = min(min(y_true), min(y_pred))
     max_val = max(max(y_true), max(y_pred))
@@ -29,7 +29,7 @@ def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, tit
     plt.grid(True)
     
     # Subplot 2: Relative Error vs Measured Core Loss
-    plt.subplot(1, 4, 2)  # Changed from (1, 3, 2) to (1, 4, 2)
+    plt.subplot(1, 4, 2)  
     plt.scatter(y_true, relative_errors, alpha=0.6, edgecolors='b', label='Relative Errors')
     plt.axhline(y=np.mean(relative_errors), color='r', linestyle='--', label=f"Avg = {np.mean(relative_errors):.2f}%")
     plt.xlabel('Measured Core Loss [W]')
@@ -40,7 +40,7 @@ def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, tit
     plt.ylim(0, 50)
     
     # Subplot 3: Absolute Error vs Measured Core Loss
-    plt.subplot(1, 4, 3)  # Remains (1, 4, 3)
+    plt.subplot(1, 4, 3)  
     plt.scatter(y_true, absolute_errors, alpha=0.6, edgecolors='b', label='Absolute Errors')
     plt.axhline(y=mae, color='r', linestyle='--', label=f"MAE = {mae:.6f} W")
     plt.xlabel('Measured Core Loss [W]')
@@ -50,7 +50,7 @@ def plot_results(y_true, y_pred, relative_errors, are, absolute_errors, mae, tit
     plt.grid(True)
     
     # Subplot 4: Error Distribution (Histogram)
-    plt.subplot(1, 4, 4)  # Remains (1, 4, 4)
+    plt.subplot(1, 4, 4)  
     errors = y_pred - y_true
     plt.hist(errors, bins=20, edgecolor='black')
     plt.xlabel('Prediction Error [W]')
@@ -282,11 +282,6 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     y_test_true = torch.cat(y_test_true).numpy().flatten()
     y_test_pred_best = torch.cat(y_test_pred_best).numpy().flatten()
 
-    # # Log final validation loss correctly when NOT using Optuna
-    # print(f"Final Validation Loss: {epoch_valid_loss}")
-    # if trial is None:
-    #     final_epoch_loss = epoch_valid_loss
-
     # Compute metrics for plotting
     epsilon = 0.001
     relative_errors_best = np.abs(y_test_pred_best - y_test_true) / (y_test_true + epsilon) * 100
@@ -305,8 +300,8 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
         y_test_pred_best,
         relative_errors_best,
         are_best,
-        absolute_errors_best,  # New argument
-        mae_best,              # New argument
+        absolute_errors_best,  
+        mae_best,              
         title="Core Loss Prediction Results on Test Set"
     )
     
@@ -314,98 +309,6 @@ def train_model(model, train_loader, valid_loader, test_loader, config, device, 
     return model, best_val_loss
 
 
-
-
-
-
-# inputs.size(0) is the first dimension of the inputs tensor, which is the batch size for each batch.
-
-#epoch_train_loss += loss.item() * inputs.size(0) / len(train_loader.dataset)
-#epoch_valid_loss += loss.item() * inputs.size(0) / len(valid_loader.dataset)
-
-# Why is this change necessary? (from ChatGTP) <- Xrhsto help explain this please 
-
-#     Previous issue: Loss values were being summed over all batches. Since batch sizes can vary 
-#           (especially in the last batch), this caused inconsistency in reported loss values.
-#     Fix: Dividing by the dataset size ensures that the loss reflects an average per sample 
-#           rather than an accumulation across batches.
-
-# How does it help?
-
-#     Loss values are now comparable between training, validation, and test phases.
-#     Ensures correct tracking when batch sizes vary.
-
-#-------------------------------------------------------------------------------------------------------------
-#test_loss = criterion(torch.tensor(y_test_pred), torch.tensor(y_test_true)).item()
-# Why was this needed? (from ChatGTP) <- Xrhsto help explain this please
-
-#     Previous issue: The test loss was incorrectly scaled by the dataset size, inflating the loss value.
-#     Fix: Compute the average test loss directly from the model’s predictions without multiplying by the dataset size.
-
-# How does it help?
-
-#     Ensures test loss is correctly calculated as an average loss per sample.
-#     Maintains consistency across training, validation, and test metrics.
-
-#----------------------------More Context---------------------------------------------------------------------
-# Issue: <- Xrhsto help explain this please
-
-#     The training and validation loss values are being summed instead of averaged, which makes them dependent on batch size.
-#     The test loss is being multiplied by len(y_test_true), which inflates the loss artificially.
-
-#-------------------Considering the whole test block, if it functions correctly-------------------------------
-# Why this approach is correct:
-
-#     Maintains consistency with train/validation loss calculation:
-#         In both training and validation phases, we accumulate the loss weighted by the batch size and then normalize by the total dataset size.
-#         Applying the same logic to the test phase ensures consistent loss scaling across all three sets.
-
-#     Fixes the issue with directly computing loss on tensors:
-#         criterion(torch.tensor(y_test_pred), torch.tensor(y_test_true)).item() computes the loss in one step but does not handle batched computation properly.
-#         If the test set is large, computing loss on the entire dataset at once may cause memory overflow issues.
-
-#     Prevents over/under-estimation of loss values:
-#         If we don't normalize by len(test_loader.dataset), the test loss can increase linearly with dataset size, making it not directly comparable to train/valid losses.
-
-# Why the other approaches are incorrect:
-
-#     test_loss = criterion(torch.tensor(y_test_pred), torch.tensor(y_test_true)).item()
-#         Issues:
-#             This approach directly computes the loss after collecting all predictions.
-#             It does not account for batch-wise loss accumulation.
-#             It could introduce issues if y_test_pred and y_test_true are very large (out-of-memory risk).
-#             Does not follow the same normalization process as train/valid loss.
-
-#     Keeping test_loss = criterion(predictions, core_loss).item() inside the loop without accumulation
-#         Issues:
-#             Each batch loss is not accumulated over the entire test dataset.
-#             This means we would only retain the last batch's loss, which is not representative of the whole dataset.
-
-# Point 2: Training Loss Calculation
-
-# This concerns the formula inside train_utils.py during the training loop:
-
-# epoch_train_loss += loss.item() * inputs.size(0) / len(train_loader.dataset)
-
-# Let’s break it down:
-# How Loss is Computed in PyTorch
-
-#     Each batch computes its loss:
-#     loss = criterion(outputs, core_loss)
-#         This gives an average loss per batch.
-#     You accumulate the total epoch loss:
-#         You multiply the loss by inputs.size(0), which is the batch size.
-#         Then divide by the total dataset size len(train_loader.dataset).
-#         This ensures that the final epoch_train_loss is an average over all batches.
-
-# Potential Issue (Minor)
-
-#     If the last batch is smaller (e.g., dataset size is not perfectly divisible by batch size), this formula may slightly underestimate the epoch loss.
-#     But this is generally fine, and PyTorch’s approach already averages correctly per batch.
-
-# ✅ Conclusion:
-# Your loss calculation is valid.
-# However, if we want to be precise, we could calculate a weighted batch contribution instead of averaging over all batches directly.
 
 
 

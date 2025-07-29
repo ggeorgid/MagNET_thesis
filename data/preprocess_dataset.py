@@ -49,16 +49,16 @@ def process_csv(csv_path: str) -> np.ndarray | None:
         sample_period, sample_length = df.iloc[0]
         sample_length = int(sample_length)
         
-        print(f"[DEBUG] {csv_path} -> Sample Period: {sample_period}, Sample Length: {sample_length}")
+        #print(f"[DEBUG] {csv_path} -> Sample Period: {sample_period}, Sample Length: {sample_length}")
         
         data = df.iloc[1:].values.astype(np.float64)
         num_samples = data.shape[0] // sample_length
         
-        print(f"[DEBUG] {csv_path} -> Data Shape Before Reshaping: {data.shape}")
+        #print(f"[DEBUG] {csv_path} -> Data Shape Before Reshaping: {data.shape}")
         
         data = data.reshape(num_samples, sample_length, -1)
         
-        print(f"[DEBUG] {csv_path} -> Data Shape After Reshaping: {data.shape}")
+        #print(f"[DEBUG] {csv_path} -> Data Shape After Reshaping: {data.shape}")
         
         return data, sample_length
     
@@ -157,10 +157,7 @@ def calculate_core_loss(
     current_tensor = current_tensor[:, :datalength]
 
     # Compute instantaneous power
-    power = voltage_tensor * current_tensor  # Shape: (num_samples, datalength)
-
-    # DEBUG: Print some power values before integration
-    #print(f"[DEBUG] Sample Power Values (first 10x10 block): \n{power[:10, :10].cpu().numpy()}")
+    power = voltage_tensor * current_tensor  
 
     # Use trapezoidal integration which in our case is the same as taking the mean of power
     t = torch.linspace(0, (datalength - 1) * sample_period, datalength, device=voltage_tensor.device)
@@ -234,7 +231,7 @@ def calculate_scalograms(
     sampling_period: float,
     wave_name: str = 'morl',
     sample_length: int = None,
-    total_scale: int = 40,
+    total_scale: int = 41,
     fmax: float = 10e3,
     image_size: int = 24,
     save_path: str = "data/processed/scalograms_memmap.dat"
@@ -247,7 +244,7 @@ def calculate_scalograms(
         sampling_period (float): Time between samples in seconds.
         wave_name (str): Wavelet type (default 'morl').
         sample_length (int, optional): Number of time steps to use. Defaults to full length.
-        total_scale (int): Number of scales for CWT (default 40).
+        total_scale (int): Number of scales for CWT (default 41 for 40 scales).
         fmax (float): Maximum frequency of interest in Hz (default 10e3).
         image_size (int): Size to resize scalograms to (default 24 for 24x24).
         save_path (str): Path to store the memory-mapped scalogram array (default 'data/processed/scalograms_memmap.dat').
@@ -264,7 +261,7 @@ def calculate_scalograms(
         sample_length = dataset.shape[1]
     dataset = dataset[:, :sample_length, :]
 
-    print(f"[DEBUG] Total_Scales: {total_scale} and Wavelet: {wave_name} and Image_size: {image_size} that reached here.")
+    #print(f"[DEBUG] Total_Scales: {total_scale} and Wavelet: {wave_name} and Image_size: {image_size} that reached here.")
 
     # Compute wavelet scales
     fc = pywt.central_frequency(wave_name)
@@ -292,229 +289,4 @@ def calculate_scalograms(
     return scalograms
 
 
-# Newer Version with logarithmic scales (11/6/2025)
 
-# def calculate_scalograms(
-#     dataset: np.ndarray,
-#     sampling_period: float,
-#     wave_name: str = 'morl',
-#     sample_length: int = None,
-#     total_scale: int = 40,
-#     fmax: float = 10e3,
-#     fmin: float = 1e3,  # I tried 1 here and the time to compute the scalograms exploded to 40 hours
-#     image_size: int = 24
-# ) -> torch.Tensor:
-#     """
-#     Computes scalograms from a dataset using Continuous Wavelet Transform (CWT) with real Morlet wavelet.
-
-#     Args:
-#         dataset (np.ndarray): Input dataset of shape (num_samples, time_steps, 2).
-#         sampling_period (float): Time between samples in seconds (e.g., 2e-6 s).
-#         wave_name (str): Wavelet type (default 'morl' for real Morlet).
-#         sample_length (int, optional): Number of time steps to use. Defaults to full length.
-#         total_scale (int): Number of scales for CWT (default 40).
-#         fmax (float): Maximum frequency of interest in Hz (default 10e3).
-#         fmin (float): Minimum frequency of interest in Hz (default 1.0, adjustable).
-#         image_size (int): Size to resize scalograms to (default 24 for 24x24).
-
-#     Returns:
-#         torch.Tensor: Scalogram tensor of shape (num_samples, 1, image_size, image_size).
-#     """
-#     # Validate dataset shape
-#     if dataset.ndim != 3 or dataset.shape[2] != 2:
-#         raise ValueError("Dataset must have shape (num_samples, time_steps, 2).")
-
-#     # Determine sample length
-#     if sample_length is None:
-#         sample_length = dataset.shape[1]
-#     dataset = dataset[:, :sample_length, :]
-
-#     # Compute logarithmic frequency range
-#     freqs = np.geomspace(fmax, fmin, num=total_scale)
-#     print(f"[DEBUG] Frequency Range: {freqs.min()} Hz to {freqs.max()} Hz")
-
-#     # Convert frequencies to scales using Morlet central frequency (0.8125 Hz)
-#     scales = pywt.frequency2scale(wave_name, freqs * sampling_period)
-#     print(f"[DEBUG] Computed Scales: {scales.min()} to {scales.max()}")
-
-#     # Initialize output array
-#     num_samples = dataset.shape[0]
-#     scalograms = np.empty((num_samples, image_size, image_size), dtype=np.float32)
-
-#     # Compute scalograms
-#     for index in tqdm(range(num_samples), desc="Generating Scalograms"):
-#         voltage_signal = dataset[index, :, 0]
-#         cwtmatr, _ = pywt.cwt(voltage_signal, scales, wave_name, sampling_period)
-#         scalogram = np.abs(cwtmatr)  # Absolute value for scalogram
-#         scalograms[index] = resize(scalogram, (image_size, image_size), anti_aliasing=True)
-
-#         if index == 0:
-#             print(f"[DEBUG] First Scalogram Shape: {cwtmatr.shape} | Resized to: {scalograms[index].shape}")
-
-#     # Convert to tensor
-#     scalogram_tensor = torch.tensor(scalograms, dtype=torch.float32).unsqueeze(1)
-#     return scalogram_tensor
-
-
-# def calculate_scalograms(
-#     dataset: np.ndarray,
-#     sampling_period: float,
-#     wave_name: str = 'morl',
-#     sample_length: int = None,
-#     total_scale: int = 40,
-#     fmax: float = 10e3,
-#     fmin: float = 1e3,
-#     image_size: int = 24,
-#     save_path: str = "data/processed/scalograms_memmap.dat"
-# ) -> np.memmap:
-#     """
-#     Computes scalograms using CWT and stores them in a memory-mapped array.
-
-#     Args:
-#         dataset (np.ndarray): Shape (num_samples, time_steps, 2).
-#         sampling_period (float): Time between samples in seconds.
-#         wave_name (str): Wavelet type (default 'morl').
-#         sample_length (int, optional): Number of time steps.
-#         total_scale (int): Number of scales (default 40).
-#         fmax (float): Max frequency (default 10e3 Hz).
-#         fmin (float): Min frequency (default 1e3 Hz).
-#         image_size (int): Output size (default 24).
-#         save_path (str): Path for memory-mapped file.
-
-#     Returns:
-#         np.memmap: Memory-mapped array of shape (num_samples, image_size, image_size).
-#     """
-#     if dataset.ndim != 3 or dataset.shape[2] != 2:
-#         raise ValueError("Dataset must have shape (num_samples, time_steps, 2).")
-
-#     print(f"[DEBUG] Total_Scales: {total_scale} and Image_size: {image_size} that reached here.")
-
-#     sample_length = sample_length or dataset.shape[1]
-#     dataset = dataset[:, :sample_length, :]
-#     num_samples = dataset.shape[0]
-
-#     freqs = np.geomspace(fmax, fmin, num=total_scale)
-#     scales = pywt.frequency2scale(wave_name, freqs * sampling_period)
-
-#     # Create memory-mapped array
-#     scalograms = np.memmap(save_path, dtype='float32', mode='w+', shape=(num_samples, image_size, image_size))
-
-#     for index in tqdm(range(num_samples), desc="Generating Scalograms"):
-#         voltage_signal = dataset[index, :, 0]
-#         cwtmatr, _ = pywt.cwt(voltage_signal, scales, wave_name, sampling_period)
-#         scalogram = np.abs(cwtmatr)
-#         scalograms[index] = resize(scalogram, (image_size, image_size), anti_aliasing=True)
-
-#         if index == 0:
-#             print(f"[DEBUG] First Scalogram Shape: {cwtmatr.shape} | Resized to: {scalograms[index].shape}")
-
-#     scalograms.flush()  # Write to disk
-#     return scalograms
-
-
-
-# def calculate_scalograms(
-#     dataset: np.ndarray,
-#     sampling_period: float,
-#     wave_name: str = 'morl',  # or 'cgau8' if preferred
-#     sample_length: int = None,
-#     total_scale: int = 40,
-#     fmax: float = 10e3,
-#     image_size: int = 24,
-#     save_path: str = "data/processed/scalograms_memmap.dat"
-# ) -> np.memmap:
-#     if dataset.ndim != 3 or dataset.shape[2] != 2:
-#         raise ValueError("Dataset must have shape (num_samples, time_steps, 2).")
-
-#     sample_length = sample_length or dataset.shape[1]
-#     dataset = dataset[:, :sample_length, :]
-#     num_samples = dataset.shape[0]
-
-#     # Check if the wavelet is continuous or discrete
-#     if wave_name in pywt.wavelist(kind='continuous'):
-#         # Use ContinuousWavelet for continuous wavelets
-#         wavelet = pywt.ContinuousWavelet(wave_name)
-#         # Define central frequency manually for continuous wavelets
-#         if wave_name == 'morl':
-#             fc = 0.8125  # Default central frequency for Morlet wavelet in PyWavelets
-#         else:
-#             raise NotImplementedError(f"Central frequency for {wave_name} not implemented yet.")
-#     else:
-#         # Use Wavelet for discrete wavelets
-#         wavelet = pywt.Wavelet(wave_name)
-#         fc = wavelet.center_frequency
-
-#     # Compute scales
-#     cparam = (1 / sampling_period) / fmax * fc * total_scale
-#     scales = cparam / np.arange(total_scale, 1, -1)  # Small to large scales
-
-#     scalograms = np.memmap(save_path, dtype='float32', mode='w+', shape=(num_samples, image_size, image_size))
-
-#     for index in tqdm(range(num_samples), desc="Generating Scalograms"):
-#         voltage_signal = dataset[index, :, 0]
-#         cwtmatr, _ = pywt.cwt(voltage_signal, scales, wavelet, sampling_period)
-#         scalograms[index] = resize(np.abs(cwtmatr), (image_size, image_size), anti_aliasing=True)
-
-#     scalograms.flush()
-#     return scalograms
-
-# def calculate_scalograms(
-#     dataset: np.ndarray,
-#     sampling_period: float,
-#     wave_name: str = 'morl',
-#     sample_length: int = None,
-#     total_scale: int = 40,
-#     fmax: float = 10e3,
-#     image_size: int = 24,
-#     save_path: str = "data/processed/scalograms_memmap.dat"
-# ) -> np.memmap:
-#     """
-#     Computes scalograms from a dataset using Continuous Wavelet Transform (CWT) and stores them in a memory-mapped array.
-
-#     Args:
-#         dataset (np.ndarray): Input dataset of shape (num_samples, time_steps, 2).
-#         sampling_period (float): Time between samples in seconds.
-#         wave_name (str): Wavelet type (default 'morl').
-#         sample_length (int, optional): Number of time steps to use. Defaults to full length.
-#         total_scale (int): Number of scales for CWT (default 40).
-#         fmax (float): Maximum frequency of interest in Hz (default 10e3).
-#         image_size (int): Size to resize scalograms to (default 24 for 24x24).
-#         save_path (str): Path to store the memory-mapped scalogram array (default 'data/processed/scalograms_memmap.dat').
-
-#     Returns:
-#         np.memmap: Memory-mapped array of scalograms with shape (num_samples, 1, image_size, image_size).
-#     """
-#     # Validate dataset shape
-#     if dataset.ndim != 3 or dataset.shape[2] != 2:
-#         raise ValueError("Dataset must have shape (num_samples, time_steps, 2).")
-
-#     # Determine sample length
-#     if sample_length is None:
-#         sample_length = dataset.shape[1]
-#     dataset = dataset[:, :sample_length, :]
-
-#     # Compute wavelet scales
-#     fc = pywt.central_frequency(wave_name)
-#     cparam = (1 / sampling_period) / fmax * fc * total_scale  # 1/sampling_period = sampling frequency
-#     scales = cparam / np.arange(total_scale, 1, -1)
-
-#     print(f"[DEBUG] Computed Scales: {scales}")
-#     print(f"[DEBUG] Sampling Period: {sampling_period} s | Scale Range: {scales.min()} - {scales.max()}")
-
-#     # Initialize memory-mapped array with channel dimension
-#     num_samples = dataset.shape[0]
-#     scalograms = np.memmap(save_path, dtype='float32', mode='w+', shape=(num_samples, 1, image_size, image_size))
-
-#     # Compute scalograms
-#     for index in tqdm(range(num_samples), desc="Generating Scalograms"):
-#         voltage_signal = dataset[index, :, 0]
-#         cwtmatr, _ = pywt.cwt(voltage_signal, scales, wave_name, sampling_period)
-#         resized_scalogram = resize(abs(cwtmatr), (image_size, image_size), anti_aliasing=True)
-#         scalograms[index, 0] = resized_scalogram
-
-#         if index == 0:
-#             print(f"[DEBUG] First Scalogram Shape: {cwtmatr.shape} | Resized to: {resized_scalogram.shape}")
-
-#     # Ensure data is written to disk
-#     scalograms.flush()
-#     return scalograms

@@ -6,7 +6,7 @@ import subprocess
 python_cmd = "python3" if sys.platform != "win32" else "python"
 
 # Define hyperparameter values for the sweep
-num_epochs = [50]  # Single fixed value
+num_epochs = [100]  # Single fixed value
 learning_rates = [0.001, 0.0005]
 batch_sizes = [32, 64, 128, 256]
 

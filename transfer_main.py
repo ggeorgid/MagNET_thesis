@@ -178,13 +178,7 @@ def main():
     config["DATA_SUBSET_SIZE"] = args.data_subset_size if args.data_subset_size is not None else config.get("DATA_SUBSET_SIZE", None)
     config["LEARNING_RATE"] = args.learning_rate if args.learning_rate is not None else config["LEARNING_RATE"]
     config["BATCH_SIZE"] = args.batch_size if args.batch_size is not None else config["BATCH_SIZE"]
-    #config["USE_PRETRAINED"] = args.use_pretrained if args.use_pretrained else config.get("USE_PRETRAINED", True)
-    #config["FREEZE_LAYERS"] = args.freeze_layers if args.freeze_layers else config.get("FREEZE_LAYERS", False)
-    #config["USE_PRETRAINED"] = True  # Force True for transfer learning
-    #print("🔹 [INFO] Forcing USE_PRETRAINED=True for transfer_main.py")
-    # Print USE_PRETRAINED after forcing
-    #print(f"🔹 [DEBUG] USE_PRETRAINED after forcing: {config['USE_PRETRAINED']}")
-
+    
     # Set all necessary random seeds
     torch.manual_seed(config["SEED"])
     torch.cuda.manual_seed_all(config["SEED"])
@@ -203,13 +197,7 @@ def main():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
-    # transform = transforms.Compose([
-    #     transforms.ToTensor(),  # Converts to [0, 1], shape [1, 224, 224]
-    #     transforms.Lambda(lambda x: x.repeat(3, 1, 1)),  # Repeat to [3, 224, 224]
-    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    # ])
-    # transform = transforms.Lambda(lambda x: x)
-    
+        
     # ---------------------- Dataset Download & Processing ----------------------
     raw_data_path = Path("data/raw")    
     drive_url = "https://drive.google.com/file/d/1syNCq6cr4P5rAEdkIZs5c9Ee39-NxKY9/view"    
@@ -283,7 +271,7 @@ def main():
     tensor_dataset = convert_to_tensors(dataset_subset)
     
     # ---------------------- Caching and Scalogram Processing ----------------------    
-    scalograms_path = preprocessed_data_path / "scalograms_224.npy"
+    scalograms_path = preprocessed_data_path / "scalograms_224_cmor.npy"
     core_loss_path = preprocessed_data_path / "core_loss.npy"
     scalograms_memmap_path = preprocessed_data_path / "scalograms_memmap.dat" #unused, but kept for reference
 

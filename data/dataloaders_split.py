@@ -240,8 +240,8 @@ def check_reproducibility(dataloader, name="DataLoader", seed=42):
     Returns:
         None (Prints sample values multiple times).
     """
-    torch.manual_seed(seed)  # ✅ Use the provided seed, not a hardcoded one
-    batch = next(iter(dataloader))  # Get batch
+    torch.manual_seed(seed)  
+    batch = next(iter(dataloader))  
     scalograms, core_loss_values = batch
 
     # Print first sample multiple times

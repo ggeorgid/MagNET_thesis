@@ -221,7 +221,7 @@ def main():
     
         
     # ---------------------- Caching and Scalogram Processing ----------------------
-    scalograms_path = preprocessed_data_path / "scalograms.npy"
+    scalograms_path = preprocessed_data_path / "scalograms_gaus8.npy"
     core_loss_path = preprocessed_data_path / "core_loss.npy"
     scalograms_memmap_path = preprocessed_data_path / "scalograms_memmap.dat" #unused, but kept for reference
 
@@ -347,7 +347,7 @@ def main():
     if args.optimize:
         # Run Optuna optimization
         study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
-        study.optimize(lambda trial: objective(trial, config, device, train_loader, valid_loader, test_loader), n_trials=5) #Change n_trials to change the number of trials
+        study.optimize(lambda trial: objective(trial, config, device, train_loader, valid_loader, test_loader), n_trials=100) #Change n_trials to change the number of trials
         print("\n✅ Best Hyperparameters:", study.best_params)
         with open("best_hyperparameters.json", "w") as f:
             json.dump(study.best_params, f)

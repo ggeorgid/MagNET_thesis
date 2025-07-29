@@ -299,7 +299,7 @@ def main():
     # Decide to train or optimize
     if args.optimize:
         study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner(n_warmup_steps=5))
-        study.optimize(lambda trial: objective(trial, config, device, train_loader, valid_loader, test_loader), n_trials=5)
+        study.optimize(lambda trial: objective(trial, config, device, train_loader, valid_loader, test_loader), n_trials=100)
         print("\n✅ Best Hyperparameters:", study.best_params)
         with open("best_hyperparameters.json", "w") as f:
             json.dump(study.best_params, f)

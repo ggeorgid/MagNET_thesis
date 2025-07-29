@@ -1,30 +1,23 @@
 # -------------------- General Settings --------------------
-SEED: 59                  # Random seed for reproducibility
+SEED: 20                  # Random seed for reproducibility
 USE_GPU: True             # Enable GPU acceleration if available
 DOWNLOAD_DATASET: True    # Automatically download dataset if not present
 USE_CACHED_SCALOGRAMS: True # Use precomputed scalograms if available
 USE_CACHED_CORE_LOSS: True # Use precomputed core loss for ablation model if available
 
 # -------------------- Training Parameters --------------------
-NUM_EPOCH: 50             # Total number of training epochs
+NUM_EPOCH: 100             # Total number of training epochs
 BATCH_SIZE: 128           # Number of samples per batch
 LEARNING_RATE: 0.0005     # Learning rate for optimizer
 
 # -------------------- Transfer Learning Parameters --------------------
 USE_PRETRAINED: True # Use a pretrained weights for transfer learning model <- Might have misleading name
 #FREEZE_LAYERS: True  # Freeze layers of the pretrained model
-FINE_TUNE_LAYERS: ["layer3" , "layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning
+FINE_TUNE_LAYERS: ["layer3" , "layer4" , "fc"] # Newest variable with layer names to unfreeze for transfer learning ["layer3" , "layer4" , "fc"]
 
 DATA_SUBSET_SIZE: null  # null -> Full dataset (now only an optional debug parameter)
 
 # ⚠️ Note: DATA_SUBSET_SIZE is only for debugging.  
 # ⚠️ If using USE_CACHED_SCALOGRAMS = False, scalograms will be **recomputed**.  
-# First-time users should ensure this is False to generate scalograms correctly.
 
-# -------------------- Sweep Hyperparameters (For Manual Runs) --------------------
-# Uncomment and modify below when testing sweeps manually
-# NUM_EPOCH: [50, 100]
-# BATCH_SIZE: [32, 64, 128]
-# LEARNING_RATE: [0.001, 0.0005]
-# DATA_SUBSET_SIZE: null  # Keep null for full dataset
 
